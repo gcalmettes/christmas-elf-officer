@@ -44,7 +44,7 @@ impl AoC {
         }
     }
 
-    async fn get(&self, endpoint: &str, session_cookie: Option<String>) -> BotResult<String> {
+    async fn get(&self, endpoint: &Endpoint, session_cookie: Option<String>) -> BotResult<String> {
         let url = format!("{}{}", self.base_url, endpoint);
 
         let mut request = self.http_client.get(&url);
@@ -66,13 +66,13 @@ impl AoC {
     }
 
     pub async fn global_leaderboard(&self, year: u16, day: u16) -> BotResult<String> {
-        let endpoint = Endpoint::GlobalLeaderboard(year, day).to_string();
+        let endpoint = Endpoint::GlobalLeaderboard(year, day);
         let resp = self.get(&endpoint, None).await?;
         Ok(resp)
     }
 
     pub async fn private_leaderboard(&self, year: u16) -> BotResult<String> {
-        let endpoint = Endpoint::PrivateLeaderboard(year, self.private_leaderboard_id).to_string();
+        let endpoint = Endpoint::PrivateLeaderboard(year, self.private_leaderboard_id);
         let resp = self
             .get(&endpoint, Some(self.session_cookie.clone()))
             .await?;
