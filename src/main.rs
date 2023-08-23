@@ -1,4 +1,4 @@
-use ceo_bot::aoc::AoC;
+use ceo_bot::client::aoc::AoC;
 use std::time::Duration;
 
 #[tokio::main]
@@ -11,10 +11,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // let resp = aoc_client.global_leaderboard(2022, 1).await;
-    let resp = aoc_client.private_leaderboard(2022).await;
+    // let resp = aoc_client.private_leaderboard(2022).await;
+    let resp = aoc_client.private_leaderboard(2000).await;
 
     match resp {
-        Ok(response) => println!("{:?}", response),
+        Ok(leaderboard) => println!("{:?}", leaderboard.standings_by_local_score()),
+        // Ok(response) => println!("{:?}", response),
         Err(e) => println!("{}", e),
     }
 
