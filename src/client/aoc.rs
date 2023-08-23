@@ -1,6 +1,7 @@
 use chrono::{DateTime, TimeZone, Utc};
 use itertools::Itertools;
 use reqwest::{Client, StatusCode};
+use std::cmp::Reverse;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
@@ -105,8 +106,8 @@ impl AoC {
         struct AOCPrivateLeaderboardMember {
             /// anonymous users appear with null names in the AoC API
             name: Option<String>,
-            // global_score: u64,
-            local_score: u64,
+            global_score: u64,
+            // local_score: u64,
             id: u64,
             // last_star_ts: u64,
             // stars: u64,
@@ -142,7 +143,7 @@ impl AoC {
                         id: Identifier {
                             name: name.clone(),
                             numeric: member.id,
-                            local_score: member.local_score,
+                            global_score: member.global_score,
                         },
                     });
                 }
@@ -178,7 +179,7 @@ pub struct Solution {
 struct Identifier {
     name: String,
     numeric: u64,
-    local_score: u64,
+    global_score: u64,
 }
 
 type Underlying = Vec<Solution>;
@@ -226,7 +227,7 @@ impl Leaderboard {
     }
 
     fn daily_scores_per_member(&self) -> HashMap<&Identifier, [usize; 25]> {
-        // Max point per solution is number of players
+        // Max point earned for each star is number of members in leaderboard
         let n_members = self.solutions_per_member().len();
 
         let standings_per_challenge = self.standings_per_challenge();
@@ -254,9 +255,46 @@ impl Leaderboard {
 
         scores
             .into_iter()
-            .sorted_by_key(|x| x.1)
-            .rev()
+            .sorted_by_key(|x| Reverse(x.1))
             .map(|(id, score)| (id.name.clone(), score))
+            .collect::<Vec<(String, usize)>>()
+    }
+
+    pub fn standings_by_number_of_stars(&self) -> Vec<(String, usize)> {
+        let stars = self.solutions_per_member();
+
+        stars
+            .into_iter()
+            .map(|(id, stars)| {
+                (
+                    id.name.clone(),
+                    stars.len(),
+                    // Get the timestamp of the last earned star
+                    stars.into_iter().sorted_unstable().last(),
+                )
+            })
+            // Sort by number of star (reverse) then by most recent star on equality
+            .sorted_by_key(|x| (Reverse(x.1), x.2))
+            .map(|(name, n_stars, _)| (name, n_stars))
+            .collect::<Vec<(String, usize)>>()
+    }
+
+    pub fn standings_by_global_score(&self) -> Vec<(String, u64)> {
+        self.solutions_per_member()
+            .iter()
+            .filter(|(id, _)| id.global_score > 0)
+            .map(|(id, _)| (id.name.clone(), id.global_score))
+            .sorted_by_key(|h| Reverse(h.1))
+            .collect::<Vec<(String, u64)>>()
+    }
+
+    // fn daily_scores_per_member(&self) -> HashMap<&Identifier, [usize; 25]> {
+    pub fn standings_for_day(&self, day: usize) -> Vec<(String, usize)> {
+        self.daily_scores_per_member()
+            .iter()
+            .map(|(id, daily_scores)| (id.name.clone(), daily_scores[day - 1]))
+            .filter(|(_, score)| *score > 0)
+            .sorted_by_key(|m| Reverse(m.1))
             .collect::<Vec<(String, usize)>>()
     }
 }
@@ -274,9 +312,3 @@ impl DerefMut for Leaderboard {
         &mut self.0
     }
 }
-
-// data.into_iter()
-//         .into_group_map_by(|x| x.0)
-//         .into_iter()
-//         .map(|(key, values)| (key, values.into_iter().fold(0,|acc, (_,v)| acc + v )))
-//         .collect::<HashMap<u32,u32>>()[&0]
