@@ -250,6 +250,22 @@ impl Leaderboard {
             .collect()
     }
 
+    pub fn compute_diffs(&self, current_leaderboard: &Leaderboard) -> Vec<&Solution> {
+        let current_solutions = current_leaderboard
+            .iter()
+            .map(|s| (s.id.numeric, s.day, s.part));
+
+        self.iter()
+            // The curent_solutions iterator needs to be cloned as .contains() consumes it partially
+            // (or totally if no match found)
+            .filter(|s| {
+                !current_solutions
+                    .clone()
+                    .contains(&(s.id.numeric, s.day, s.part))
+            })
+            .collect()
+    }
+
     pub fn standings_by_local_score(&self) -> Vec<(String, usize)> {
         let scores = self.local_scores_per_member();
 
