@@ -1,2 +1,2 @@
-pub mod aoc;
+pub mod client;
 mod error;
