@@ -23,14 +23,14 @@ pub struct Identifier {
     pub global_score: u64,
 }
 
-type Underlying = Vec<Solution>;
+type SolutionVec = Vec<Solution>;
 
 #[derive(Debug)]
-pub struct Leaderboard(Underlying);
+pub struct Leaderboard(SolutionVec);
 
 impl Leaderboard {
     pub fn new() -> Leaderboard {
-        Leaderboard(Underlying::new())
+        Leaderboard(SolutionVec::new())
     }
 
     /// Members => (unordered) stars
@@ -157,7 +157,7 @@ impl Leaderboard {
 }
 
 impl Deref for Leaderboard {
-    type Target = Underlying;
+    type Target = SolutionVec;
 
     fn deref(&self) -> &Self::Target {
         &self.0
