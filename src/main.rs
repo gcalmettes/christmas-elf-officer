@@ -1,54 +1,29 @@
-use ceo_bot::client::aoc::AoC;
-use std::time::Duration;
+use ceo_bot::scheduler::{JobProcess, Scheduler};
+use tokio::time::{sleep, Duration};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let aoc_client = AoC::new(
-        "http://localhost:5001".to_string(),
-        Duration::new(5, 0),
-        261166,
-        "yolo".to_string(),
-    );
+    let sched = Scheduler::new().await?;
 
-    // let resp = aoc_client.global_leaderboard(2022, 1).await;
-    // let resp = aoc_client.private_leaderboard(2022).await;
-    // match resp {
-    //     Ok(leaderboard) => {
-    //         // println!("{:?}", leaderboard.standings_by_local_score())
-    //         println!("{:?}", leaderboard.standings_by_number_of_stars());
-    //         println!("{:?}", leaderboard.standings_by_global_score());
-    //         (1..=25).for_each(|d| {
-    //             println!("\n>> DAY {}", d);
-    //             leaderboard
-    //                 .standings_for_day(d)
-    //                 .iter()
-    //                 .for_each(|(name, score)| {
-    //                     println!("  {} {}", name, score);
-    //                 })
-    //         });
-    //         let diffs = leaderboard.compute_diffs(&leaderboard);
-    //         println!("{:?}", diffs);
-    //     }
-    //     Err(e) => println!("{}", e),
-    // }
+    let jobs = vec![
+        JobProcess::UpdatePrivateLeaderboard("1/3 * * * * *"),
+        JobProcess::UpdatePrivateLeaderboard("1/6 * * * * *"),
+        JobProcess::UpdatePrivateLeaderboard("1/9 * * * * *"),
+        JobProcess::WatchGlobalLeaderboard("1/15 * * * * *"),
+    ];
+    for job in jobs {
+        let _ = sched.add_job(job).await;
+    }
 
-    let leaderboard_old = aoc_client.private_leaderboard(2020).await.unwrap();
-    let leaderboard = aoc_client.private_leaderboard(2022).await.unwrap();
+    // Start the scheduler
+    sched.start().await?;
 
-    println!("{:?}", leaderboard.standings_by_number_of_stars());
-    println!("{:?}", leaderboard.standings_by_global_score());
-    (1..=25).for_each(|d| {
-        println!("\n>> DAY {}", d);
-        leaderboard
-            .standings_for_day(d)
-            .iter()
-            .for_each(|(name, score)| {
-                println!("  {} {}", name, score);
-            })
-    });
-    let diffs = leaderboard.compute_diffs(&leaderboard_old);
-    println!("{:?}", diffs);
-    println!("{:?}", diffs.len());
+    // Wait while the jobs run
+    loop {
+        let size = sched.cache_size();
+        let ref_count = sched.ref_count();
 
-    Ok(())
+        println!("[{:?}] {:?}", size, ref_count);
+        sleep(Duration::from_millis(1000)).await;
+    }
 }
