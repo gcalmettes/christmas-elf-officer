@@ -1,20 +1,18 @@
-use tokio_cron_scheduler::{Job, JobScheduler, JobSchedulerError};
+use tokio_cron_scheduler::{Job, JobScheduler};
 
 use std::sync::Arc;
 
 use crate::aoc::client::AoC;
-use crate::storage::Cache;
+use crate::error::{BotError, BotResult};
+use crate::storage::MemoryCache;
 
 pub enum JobProcess<'schedule> {
     UpdatePrivateLeaderboard(&'schedule str),
     WatchGlobalLeaderboard(&'schedule str),
 }
 
-pub async fn update_private_leaderboard_job(
-    schedule: &str,
-    cache: Cache,
-) -> Result<Job, JobSchedulerError> {
-    Job::new_async(schedule, move |uuid, mut l| {
+pub async fn update_private_leaderboard_job(schedule: &str, cache: MemoryCache) -> BotResult<Job> {
+    let job = Job::new_async(schedule, move |uuid, mut l| {
         let cache = cache.clone();
 
         Box::pin(async move {
@@ -25,8 +23,8 @@ pub async fn update_private_leaderboard_job(
                     *data = leaderboard;
                 }
                 Err(e) => {
-                    // err
-                    ()
+                    let error = BotError::AOC(format!("Could not retrieve leaderboard. {e}"));
+                    println!("{}", error);
                 }
             };
 
@@ -37,41 +35,41 @@ pub async fn update_private_leaderboard_job(
                 _ => println!(">> Could not get next tick for refresh leaderboard job"),
             }
         })
-    })
+    })?;
+    Ok(job)
 }
 
-pub async fn watch_global_leaderboard_job(
-    schedule: &str,
-    _cache: Cache,
-) -> Result<Job, JobSchedulerError> {
-    Job::new_async(schedule, move |uuid, mut l| {
+pub async fn watch_global_leaderboard_job(schedule: &str, _cache: MemoryCache) -> BotResult<Job> {
+    let job = Job::new_async(schedule, |uuid, mut l| {
+        // let cache = cache.clone();
+
         Box::pin(async move {
+            let _aoc_client = AoC::new();
+
             // Query the next execution time for this job
             let next_tick = l.next_tick_for_job(uuid).await;
             match next_tick {
-                Ok(Some(ts)) => println!(">> Next global leaderboard watch at {:?}", ts),
-                _ => println!(">> Could not get next tick for global leaderboard job"),
+                Ok(Some(ts)) => println!(">> Next refresh leaderboard at {:?}", ts),
+                _ => println!(">> Could not get next tick for refresh leaderboard job"),
             }
         })
-    })
+    })?;
+    Ok(job)
 }
 
 pub struct Scheduler {
     scheduler: JobScheduler,
-    cache: Cache,
+    cache: MemoryCache,
 }
 
 impl Scheduler {
-    pub async fn new() -> Result<Self, JobSchedulerError> {
+    pub async fn new() -> BotResult<Self> {
+        let cache = MemoryCache::new();
         let scheduler = JobScheduler::new().await?;
-        let cache = Cache::new();
         Ok(Scheduler { scheduler, cache })
     }
 
-    pub async fn add_job(
-        &self,
-        job_process: JobProcess<'_>,
-    ) -> Result<uuid::Uuid, JobSchedulerError> {
+    pub async fn add_job(&self, job_process: JobProcess<'_>) -> BotResult<uuid::Uuid> {
         let job = match job_process {
             JobProcess::UpdatePrivateLeaderboard(schedule) => {
                 update_private_leaderboard_job(schedule, self.cache.clone()).await?
@@ -80,11 +78,11 @@ impl Scheduler {
                 watch_global_leaderboard_job(schedule, self.cache.clone()).await?
             }
         };
-        self.scheduler.add(job).await
+        Ok(self.scheduler.add(job).await?)
     }
 
-    pub async fn start(&self) -> Result<(), JobSchedulerError> {
-        self.scheduler.start().await
+    pub async fn start(&self) -> BotResult<()> {
+        Ok(self.scheduler.start().await?)
     }
 
     pub fn cache_size(&self) -> usize {

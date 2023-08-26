@@ -1,19 +1,17 @@
-// use chrono::Duration;
-// use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
 
 use crate::aoc::leaderboard::Leaderboard;
 
-type CacheDatabase = Arc<Mutex<Leaderboard>>;
+type SharedLeaderboard = Arc<Mutex<Leaderboard>>;
 
 #[derive(Clone)]
-pub struct Cache {
-    pub data: CacheDatabase,
+pub struct MemoryCache {
+    pub data: SharedLeaderboard,
 }
 
-impl Cache {
-    pub fn new() -> Cache {
-        Cache {
+impl MemoryCache {
+    pub fn new() -> MemoryCache {
+        MemoryCache {
             data: Arc::new(Mutex::new(Leaderboard::new())),
         }
     }

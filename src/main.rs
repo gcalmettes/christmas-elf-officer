@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         JobProcess::WatchGlobalLeaderboard("1/15 * * * * *"),
     ];
     for job in jobs {
-        let _ = sched.add_job(job).await;
+        sched.add_job(job).await?;
     }
 
     // Start the scheduler
