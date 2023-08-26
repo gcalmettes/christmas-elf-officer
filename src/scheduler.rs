@@ -24,7 +24,7 @@ pub async fn update_private_leaderboard_job(schedule: &str, cache: MemoryCache) 
                 }
                 Err(e) => {
                     let error = BotError::AOC(format!("Could not retrieve leaderboard. {e}"));
-                    println!("{}", error);
+                    eprintln!("{}", error);
                 }
             };
 
