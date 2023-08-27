@@ -1,15 +1,19 @@
 use chrono::{TimeZone, Utc};
 use reqwest::{Client, StatusCode};
+use scraper::{Html, Selector};
 use std::fmt;
 
 use std::collections::HashMap;
 
-use crate::aoc::leaderboard::{Identifier, Leaderboard, Solution};
+use crate::aoc::leaderboard::{
+    GlobalLeaderboard, GlobalLeaderboardEntry, Identifier, PrivateLeaderboard,
+    ScrapedPrivateLeaderboard, Solution,
+};
 use crate::error::{BotError, BotResult};
 
 enum Endpoint {
-    GlobalLeaderboard(u16, u16),
-    PrivateLeaderboard(u16, u64),
+    GlobalLeaderboard(i32, u8),
+    PrivateLeaderboard(i32, u64),
 }
 
 impl fmt::Display for Endpoint {
@@ -39,6 +43,7 @@ struct AoCSettings {
     session_cookie: String,
 }
 
+// TODO: get settings from env var or fallback on default
 fn get_default_settings() -> AoCSettings {
     AoCSettings {
         base_url: "http://localhost:5001".to_string(),
@@ -81,18 +86,19 @@ impl AoC {
         }
     }
 
-    async fn get_global_leaderboard(&self, year: u16, day: u16) -> BotResult<String> {
+    async fn get_global_leaderboard(&self, year: i32, day: u8) -> BotResult<String> {
         let endpoint = Endpoint::GlobalLeaderboard(year, day);
         let resp = self.get(&endpoint, None).await?;
         Ok(resp)
     }
 
-    pub async fn global_leaderboard(&self, year: u16, day: u16) -> BotResult<String> {
-        let resp = self.get_global_leaderboard(year, day).await?;
-        Ok(resp)
+    pub async fn global_leaderboard(&self, year: i32, day: u8) -> BotResult<GlobalLeaderboard> {
+        let leaderboard_response = self.get_global_leaderboard(year, day).await?;
+        let leaderboard = AoC::parse_global_leaderboard(&leaderboard_response, year, day)?;
+        Ok(leaderboard)
     }
 
-    async fn get_private_leaderboard(&self, year: u16) -> BotResult<String> {
+    async fn get_private_leaderboard(&self, year: i32) -> BotResult<String> {
         let endpoint = Endpoint::PrivateLeaderboard(year, self.private_leaderboard_id);
         let resp = self
             .get(&endpoint, Some(self.session_cookie.clone()))
@@ -100,9 +106,35 @@ impl AoC {
         Ok(resp)
     }
 
-    fn parse_private_leaderboard(leaderboard: &str) -> BotResult<Leaderboard> {
+    pub async fn private_leaderboard(&self, year: i32) -> BotResult<ScrapedPrivateLeaderboard> {
+        let leaderboard_response = self.get_private_leaderboard(year).await?;
+        let leaderboard = AoC::parse_private_leaderboard(&leaderboard_response)?;
+        Ok(ScrapedPrivateLeaderboard {
+            timestamp: Utc::now(),
+            leaderboard,
+        })
+    }
+
+    fn parse_global_leaderboard(
+        leaderboard: &str,
+        year: i32,
+        day: u8,
+    ) -> BotResult<GlobalLeaderboard> {
+        let document = Html::parse_document(&leaderboard);
+
+        let selector = Selector::parse(r#"div.leaderboard-entry"#).unwrap();
+
+        let entries = document
+            .select(&selector)
+            .filter_map(|entry| GlobalLeaderboardEntry::from_html(entry, year, day))
+            .collect::<Vec<GlobalLeaderboardEntry>>();
+
+        Ok(GlobalLeaderboard(entries))
+    }
+
+    fn parse_private_leaderboard(leaderboard: &str) -> BotResult<PrivateLeaderboard> {
         // Response from AOC private leaderboard API.
-        // Defined here as it is only used by this function.
+        // Structs defined here as it is only used by this function.
         use serde::Deserialize;
 
         #[derive(Debug, Deserialize)]
@@ -132,7 +164,7 @@ impl AoC {
         }
 
         let parsed = serde_json::from_str::<AOCPrivateLeaderboardResponse>(&leaderboard).unwrap();
-        let mut earned_stars = Leaderboard::new();
+        let mut earned_stars = PrivateLeaderboard::new();
 
         for (_, member) in parsed.members.iter() {
             let name = match &member.name {
@@ -164,11 +196,5 @@ impl AoC {
         earned_stars.sort_unstable();
 
         Ok(earned_stars)
-    }
-
-    pub async fn private_leaderboard(&self, year: u16) -> BotResult<Leaderboard> {
-        let leaderboard_response = self.get_private_leaderboard(year).await?;
-        let leaderboard = AoC::parse_private_leaderboard(&leaderboard_response)?;
-        Ok(leaderboard)
     }
 }
