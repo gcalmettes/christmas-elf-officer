@@ -19,9 +19,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sched = Scheduler::new().await?;
 
     let jobs = vec![
-        // JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
+        JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
         // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
-        JobProcess::WatchGlobalLeaderboard("1/10 * * * * *"),
+        JobProcess::WatchGlobalLeaderboard("1/20 * * * * *"),
     ];
     for job in jobs {
         sched.add_job(job).await?;
@@ -36,7 +36,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let ref_count = sched.ref_count();
 
         println!("[{:?}] {:?}", size, ref_count);
-        sleep(Duration::from_millis(1000)).await;
+        sleep(Duration::from_millis(5000)).await;
     }
 
     //               sec  min   hour   day of month   month   day of week   year

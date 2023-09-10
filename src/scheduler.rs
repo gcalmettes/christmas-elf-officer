@@ -107,27 +107,76 @@ async fn update_private_leaderboard_job(schedule: &str, cache: MemoryCache) -> B
     Ok(job)
 }
 
-async fn watch_global_leaderboard_job(schedule: &str, _cache: MemoryCache) -> BotResult<Job> {
-    let job = Job::new_async(schedule, |uuid, mut l| {
-        // let cache = cache.clone();
+async fn watch_global_leaderboard_job(schedule: &str, cache: MemoryCache) -> BotResult<Job> {
+    let job = Job::new_async(schedule, move |uuid, mut l| {
+        let cache = cache.clone();
 
         Box::pin(async move {
-            let _aoc_client = AoC::new();
-
             let aoc_client = AoC::new();
-            //TODO: Set year and day programmatically from Utc::now()
-            match aoc_client.global_leaderboard(2022, 1).await {
-                Ok(scraped_leaderboard) => {
-                    println!("{:?}", scraped_leaderboard);
-                    println!(">> {:?}", scraped_leaderboard.len());
-                    // let mut data = cache.data.lock().unwrap();
-                    // *data = scraped_leaderboard;
-                }
-                Err(e) => {
-                    let error = BotError::AOC(format!("Could not scrape global leaderboard. {e}"));
-                    eprintln!("{}", error);
-                }
-            };
+
+            //TODO: set interval to what we want
+            let mut interval = time::interval(Duration::from_secs(3));
+
+            let mut global_leaderboard_is_complete = false;
+            while !global_leaderboard_is_complete {
+                println!("GLobal leaderboard not complete");
+                //TODO: Set year and day programmatically from Utc::now()
+                match aoc_client.global_leaderboard(2022, 1).await {
+                    Ok(scraped_leaderboard) => {
+                        println!("is complete {}", scraped_leaderboard.is_complete());
+                        global_leaderboard_is_complete = scraped_leaderboard.is_complete();
+
+                        // check if private members made it to the global leaderboard
+                        let private_leaderboard = cache.data.lock().unwrap();
+                        let heroes = scraped_leaderboard
+                            .look_for_private_members(&private_leaderboard.leaderboard);
+
+                        // TODO: replace with function that sends message to matterbridge
+                        for hero in heroes {
+                            println!("HERO made the leaderboard: {}", hero.name);
+                        }
+                    }
+                    Err(e) => {
+                        let error =
+                            BotError::AOC(format!("Could not scrape global leaderboard. {e}"));
+                        eprintln!("{}", error);
+                    }
+                };
+
+                interval.tick().await;
+            }
+
+            ////TODO: Set year and day programmatically from Utc::now()
+            //match aoc_client.global_leaderboard(2022, 1).await {
+            //    Ok(scraped_leaderboard) => {
+            //        // check if private members made it to the global leaderboard
+            //        let private_leaderboard = cache.data.lock().unwrap();
+            //        let heroes = scraped_leaderboard
+            //            .look_for_private_members(&private_leaderboard.leaderboard);
+
+            //        // TODO: replace with function that sends message to matterbridge
+            //        for hero in heroes {
+            //            println!("HERO made the leaderboard: {}", hero.name);
+            //        }
+
+            //        // println!(
+            //        //     ">> {:?} [{:?}]",
+            //        //     scraped_leaderboard.len(),
+            //        //     scraped_leaderboard.is_complete()
+            //        // );
+
+            //        // let deltas_min = scraped_leaderboard.get_fastest_delta();
+            //        // let deltas_max = scraped_leaderboard.get_slowest_delta();
+            //        // println!(">> DELTAS: {:?}, {:?}", deltas_min, deltas_max);
+
+            //        // let mut data = cache.data.lock().unwrap();
+            //        // *data = scraped_leaderboard;
+            //    }
+            //    Err(e) => {
+            //        let error = BotError::AOC(format!("Could not scrape global leaderboard. {e}"));
+            //        eprintln!("{}", error);
+            //    }
+            //};
 
             // let mut interval = time::interval(Duration::from_secs(1));
 

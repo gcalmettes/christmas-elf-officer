@@ -62,11 +62,20 @@ impl PrivateLeaderboard {
         self.iter().into_group_map_by(|a| (a.day, a.part))
     }
 
-    fn members_ids(&self) -> Vec<u64> {
+    pub fn members_ids(&self) -> Vec<u64> {
         self.solutions_per_member()
             .iter()
             .map(|(id, _)| id.numeric)
             .collect::<Vec<u64>>()
+    }
+
+    pub fn get_member_by_id(&self, id: u64) -> Option<&Identifier> {
+        self.solutions_per_member()
+            .into_iter()
+            .find_map(|(m_id, _)| match m_id.numeric == id {
+                true => Some(m_id),
+                false => None,
+            })
     }
 
     fn standings_per_challenge(&self) -> HashMap<(u8, u8), Vec<&Identifier>> {
@@ -186,7 +195,7 @@ impl PrivateLeaderboard {
                         let mut ordered_parts =
                             solutions_for_day.sorted_by_key(|s| s.timestamp).tuples();
                         let (first, second) = ordered_parts.next().unwrap();
-                        Some((id.name, second.timestamp - first.timestamp))
+                        Some((id.name.clone(), second.timestamp - first.timestamp))
                     }
                     _ => unreachable!(),
                 }
@@ -338,6 +347,24 @@ impl GlobalLeaderboard {
         self.sorted_deltas().last()
     }
 
+    pub fn look_for_private_members(
+        &self,
+        private_leaderboard: &PrivateLeaderboard,
+    ) -> Vec<Identifier> {
+        let private_members_ids = private_leaderboard.members_ids();
+        let heroes = self
+            .iter()
+            .filter(|entry| private_members_ids.contains(&entry.id))
+            .map(|entry| {
+                private_leaderboard
+                    .get_member_by_id(entry.id)
+                    // we can safely unwrap as if it enters the map there is a match
+                    .unwrap()
+                    .clone()
+            })
+            .collect::<Vec<Identifier>>();
+        heroes
+    }
     //TODO:
     // check_heroes
 }
