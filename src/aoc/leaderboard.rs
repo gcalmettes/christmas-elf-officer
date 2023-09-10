@@ -4,6 +4,7 @@ use itertools::Itertools;
 use scraper::Selector;
 use std::cmp::Reverse;
 use std::collections::HashMap;
+use std::iter::Iterator;
 use std::ops::{Deref, DerefMut};
 
 // Puzzle completion events parsed from AoC API.
@@ -164,14 +165,34 @@ impl PrivateLeaderboard {
             .collect::<Vec<(String, u64)>>()
     }
 
-    // fn daily_scores_per_member(&self) -> HashMap<&Identifier, [usize; 25]> {
-    pub fn standings_for_day(&self, day: usize) -> Vec<(String, usize)> {
+    pub fn standings_by_local_score_for_day(&self, day: usize) -> Vec<(String, usize)> {
         self.daily_scores_per_member()
             .iter()
             .map(|(id, daily_scores)| (id.name.clone(), daily_scores[day - 1]))
             .filter(|(_, score)| *score > 0)
             .sorted_by_key(|m| Reverse(m.1))
             .collect::<Vec<(String, usize)>>()
+    }
+
+    // ranking by time between part 1 and part 2 completions
+    pub fn standings_by_delta_for_day(&self, day: u8) -> Vec<(String, Duration)> {
+        self.solutions_per_member()
+            .into_iter()
+            .filter_map(|(id, solutions)| {
+                let solutions_for_day = solutions.iter().filter(|s| s.day == day);
+                match solutions_for_day.clone().count() {
+                    0 | 1 => None,
+                    2 => {
+                        let mut ordered_parts =
+                            solutions_for_day.sorted_by_key(|s| s.timestamp).tuples();
+                        let (first, second) = ordered_parts.next().unwrap();
+                        Some((id.name, second.timestamp - first.timestamp))
+                    }
+                    _ => unreachable!(),
+                }
+            })
+            .sorted_by_key(|r| r.1)
+            .collect::<Vec<(String, Duration)>>()
     }
 }
 
@@ -189,11 +210,136 @@ impl DerefMut for PrivateLeaderboard {
     }
 }
 
-impl PrivateLeaderboard {
+impl GlobalLeaderboard {
+    pub fn is_complete(&self) -> bool {
+        self.0.len() == 200
+    }
+
+    fn sorted_ranks(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            u8,
+            Option<&GlobalLeaderboardEntry>,
+            Option<&GlobalLeaderboardEntry>,
+        ),
+    > {
+        let by_rank = self.0.iter().into_group_map_by(|e| e.rank);
+        by_rank
+            .into_iter()
+            .map(|(rank, times)| {
+                let mut chronologically_ordered = times.into_iter().sorted_by_key(|e| e.time);
+                (
+                    rank,
+                    chronologically_ordered.next(),
+                    chronologically_ordered.next(),
+                )
+            })
+            .sorted_by_key(|t| t.0)
+    }
+
+    // global entries with addition of part (1|2) label
+    fn labeled_entries(&self) -> Vec<(u64, chrono::Duration, usize)> {
+        self.sorted_ranks()
+            .flat_map(|(_r, p1, p2)| {
+                [p1, p2]
+                    .into_iter()
+                    .enumerate()
+                    .filter_map(|(part, s)| s.map_or(None, |t| Some((t.id, t.time, part + 1))))
+            })
+            .collect()
+    }
+
+    fn sorted_deltas(&self) -> std::vec::IntoIter<Duration> {
+        let labeled_solves = self.labeled_entries();
+
+        // Needed for computation of deltas for members who only scored one part of the global
+        // leaderboard that day.
+        let (max_time_for_first_part, max_time_for_second_part) =
+            labeled_solves.clone().iter().fold(
+                (Duration::milliseconds(0), Duration::milliseconds(0)),
+                |mut acc, entry| match entry.2 {
+                    1 => {
+                        if entry.1 > acc.0 {
+                            acc.0 = entry.1
+                        };
+                        acc
+                    }
+                    2 => {
+                        if entry.1 > acc.1 {
+                            acc.1 = entry.1
+                        };
+                        acc
+                    }
+                    // only two parts for each problem
+                    _ => unreachable!(),
+                },
+            );
+
+        let by_id = labeled_solves.iter().into_group_map_by(|e| e.0);
+        by_id
+            .into_iter()
+            .map(|(_id, times)| {
+                let mut chronologically_ordered = times.into_iter().sorted();
+                match (
+                    chronologically_ordered.next(),
+                    chronologically_ordered.next(),
+                ) {
+                    (Some(solve_first_part), Some(solve_second_part)) => {
+                        solve_second_part.1 - solve_first_part.1
+                    }
+                    (Some(solve), None) => {
+                        match solve.2 {
+                            1 => {
+                                // Scored only first part, second part overtime.
+                                // Duration is > (max second part - part.1), so we'll add 1 to the
+                                // diff as we have no way to know exactly
+                                max_time_for_second_part - solve.1 + Duration::seconds(1)
+                            }
+                            2 => {
+                                // Overtimed on first part, but came by strong to score second part
+                                // Duration is > (part.1, - max first part). We'll substract 1 sec.
+                                solve.1 - max_time_for_first_part - Duration::seconds(1)
+                            }
+                            _ => unreachable!(),
+                        }
+                    }
+                    (_, _) => unreachable!(),
+                }
+            })
+            .sorted()
+    }
+
+    pub fn get_fastest_times(
+        &self,
+    ) -> Option<(
+        u8,
+        Option<&GlobalLeaderboardEntry>,
+        Option<&GlobalLeaderboardEntry>,
+    )> {
+        self.sorted_ranks().next()
+    }
+
+    pub fn get_slowest_times(
+        &self,
+    ) -> Option<(
+        u8,
+        Option<&GlobalLeaderboardEntry>,
+        Option<&GlobalLeaderboardEntry>,
+    )> {
+        self.sorted_ranks().last()
+    }
+
+    pub fn get_fastest_delta(&self) -> Option<Duration> {
+        self.sorted_deltas().next()
+    }
+
+    pub fn get_slowest_delta(&self) -> Option<Duration> {
+        self.sorted_deltas().last()
+    }
+
     //TODO:
-    // is_complete
     // check_heroes
-    // get delta times
 }
 
 impl Deref for GlobalLeaderboard {
