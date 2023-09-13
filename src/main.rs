@@ -1,54 +1,52 @@
-use ceo_bot::client::aoc::AoC;
-use std::time::Duration;
+use ceo_bot::scheduler::{JobProcess, Scheduler};
+use tokio::time::{sleep, Duration};
+
+use chrono::{Timelike, Utc};
+use cron::Schedule;
+use std::str::FromStr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let aoc_client = AoC::new(
-        "http://localhost:5001".to_string(),
-        Duration::new(5, 0),
-        261166,
-        "yolo".to_string(),
-    );
+    // Retrieve current minute to initialize schedule of private leaderbaord updates.
+    // AoC API rules states to not fetch leaderboard at a frequency higher than 15min.
+    let now = Utc::now();
+    let now_minute = now.minute();
+    let now_second = now.second();
 
-    // let resp = aoc_client.global_leaderboard(2022, 1).await;
-    // let resp = aoc_client.private_leaderboard(2022).await;
-    // match resp {
-    //     Ok(leaderboard) => {
-    //         // println!("{:?}", leaderboard.standings_by_local_score())
-    //         println!("{:?}", leaderboard.standings_by_number_of_stars());
-    //         println!("{:?}", leaderboard.standings_by_global_score());
-    //         (1..=25).for_each(|d| {
-    //             println!("\n>> DAY {}", d);
-    //             leaderboard
-    //                 .standings_for_day(d)
-    //                 .iter()
-    //                 .for_each(|(name, score)| {
-    //                     println!("  {} {}", name, score);
-    //                 })
-    //         });
-    //         let diffs = leaderboard.compute_diffs(&leaderboard);
-    //         println!("{:?}", diffs);
-    //     }
-    //     Err(e) => println!("{}", e),
+    // At every 15th minute from (now_minute % 15) through 59.
+    let private_leaderboard_schedule = format!("{} {}/15 * 1-25 12 *", now_second, now_minute % 15);
+
+    let sched = Scheduler::new().await?;
+
+    let jobs = vec![
+        JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
+        // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
+        JobProcess::WatchGlobalLeaderboard("1/20 * * * * *"),
+    ];
+    for job in jobs {
+        sched.add_job(job).await?;
+    }
+
+    // Start the scheduler
+    sched.start().await?;
+
+    // Wait while the jobs run
+    loop {
+        let size = sched.cache_size();
+        let ref_count = sched.ref_count();
+
+        println!("[{:?}] {:?}", size, ref_count);
+        sleep(Duration::from_millis(5000)).await;
+    }
+
+    //               sec  min   hour   day of month   month   day of week   year
+    // let expression = "0   30   9,12,15     1,15       May-Aug  Mon,Wed,Fri  2018/2";
+
+    // let schedule = Schedule::from_str(&private_leaderboard_schedule).unwrap();
+    // println!("Upcoming fire times:");
+    // for datetime in schedule.upcoming(Utc).take(10) {
+    //     println!("-> {}", datetime);
     // }
-
-    let leaderboard_old = aoc_client.private_leaderboard(2020).await.unwrap();
-    let leaderboard = aoc_client.private_leaderboard(2022).await.unwrap();
-
-    println!("{:?}", leaderboard.standings_by_number_of_stars());
-    println!("{:?}", leaderboard.standings_by_global_score());
-    (1..=25).for_each(|d| {
-        println!("\n>> DAY {}", d);
-        leaderboard
-            .standings_for_day(d)
-            .iter()
-            .for_each(|(name, score)| {
-                println!("  {} {}", name, score);
-            })
-    });
-    let diffs = leaderboard.compute_diffs(&leaderboard_old);
-    println!("{:?}", diffs);
-    println!("{:?}", diffs.len());
 
     Ok(())
 }
