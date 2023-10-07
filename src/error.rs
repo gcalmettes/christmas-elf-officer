@@ -8,15 +8,24 @@ pub type BotResult<T> = Result<T, BotError>;
 #[derive(Debug)]
 pub enum BotError {
     Http(String),
+    IO(String),
     Scheduler(String),
     AOC(String),
     Parse,
+}
+
+// pub fn convert_err(e: reqwest::Error) -> std::io::Error {
+//     std::io::Error::new(std::io::ErrorKind::Other, e)
+// }
+pub fn convert_err(e: reqwest::Error) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::Other, e)
 }
 
 impl fmt::Display for BotError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             BotError::Http(s) => write!(f, "HTTP Error: {}", s),
+            BotError::IO(s) => write!(f, "IO Error: {}", s),
             BotError::Scheduler(s) => write!(f, "Scheduler Error: {}", s),
             BotError::AOC(s) => write!(f, "AOC Error: {}", s),
             BotError::Parse => write!(f, "Parse Error"),
@@ -29,6 +38,18 @@ impl Error for BotError {}
 impl From<reqwest::Error> for BotError {
     fn from(error: reqwest::Error) -> Self {
         BotError::Http(error.to_string())
+    }
+}
+
+// impl From<reqwest::Error> for std::io::Error {
+//     fn from(error: reqwest::Error) -> Self {
+//         std::io::Error::new(std::io::ErrorKind::Other, error)
+//     }
+// }
+
+impl From<std::io::Error> for BotError {
+    fn from(error: std::io::Error) -> Self {
+        BotError::IO(error.to_string())
     }
 }
 
