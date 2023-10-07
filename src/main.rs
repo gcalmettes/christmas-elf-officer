@@ -20,10 +20,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sched = Scheduler::new().await?;
 
     let jobs = vec![
-        JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
-        JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
+        // JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
+        // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
         // JobProcess::UpdatePrivateLeaderboard("1/8 * * * * *"),
-        JobProcess::WatchGlobalLeaderboard("1/20 * * * * *"),
+        // JobProcess::WatchGlobalLeaderboard("1/20 * * * * *"),
     ];
     for job in jobs {
         sched.add_job(job).await?;
@@ -41,11 +41,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // let _stream = matterbridge.read_stream().await?;
         match matterbridge.read_stream().await {
             Ok(_r) => {
-                println!("Connected ...");
+                ()
+                // println!("Connected ...");
             }
             Err(e) => {
                 println!(">>> {:?}", e);
-                println!("[Lost stream] retrying ...");
+                println!("[Lost stream] retrying in 5 secs ...");
             }
         }
         sleep(Duration::from_millis(5000)).await;
