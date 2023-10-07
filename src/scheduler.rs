@@ -82,7 +82,7 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
                 }
                 Err(e) => {
                     let error = BotError::AOC(format!("Could not scrape leaderboard. {e}"));
-                    error!("{}", error);
+                    error!("{error}");
                 }
             };
         })
@@ -104,13 +104,23 @@ async fn update_private_leaderboard_job(
                 Ok(scraped_leaderboard) => {
                     let mut data = cache.data.lock().unwrap();
                     *data = scraped_leaderboard;
-                    sender.send(MyEvent {
+                    match sender.send(MyEvent {
                         event: "private updated!".to_string(),
-                    });
+                    }) {
+                        Ok(_) => {
+                            // wonderful, nothing to add
+                        }
+                        Err(e) => {
+                            let error = BotError::ChannelSend(format!(
+                                "Could not send message to MPSC channel. {e}"
+                            ));
+                            error!("{error}");
+                        }
+                    };
                 }
                 Err(e) => {
                     let error = BotError::AOC(format!("Could not scrape leaderboard. {e}"));
-                    error!("{}", error);
+                    error!("{error}");
                 }
             };
 
@@ -144,7 +154,7 @@ async fn watch_global_leaderboard_job(
             while !global_leaderboard_is_complete {
                 info!("GLobal leaderboard not complete");
                 //TODO: Set year and day programmatically from Utc::now()
-                match aoc_client.global_leaderboard(2022, 1).await {
+                match aoc_client.global_leaderboard(2022, 9).await {
                     Ok(scraped_leaderboard) => {
                         info!(
                             "Global Leaderboard is complete {}",
@@ -153,9 +163,19 @@ async fn watch_global_leaderboard_job(
                         global_leaderboard_is_complete = scraped_leaderboard.is_complete();
 
                         if global_leaderboard_is_complete {
-                            sender.send(MyEvent {
+                            match sender.send(MyEvent {
                                 event: "Global Leaderboard Complete!".to_string(),
-                            });
+                            }) {
+                                Ok(_) => {
+                                    // wonderful, nothing to add
+                                }
+                                Err(e) => {
+                                    let error = BotError::ChannelSend(format!(
+                                        "Could not send message to MPSC channel. {e}"
+                                    ));
+                                    error!("{error}");
+                                }
+                            };
                         }
 
                         // check if private members made it to the global leaderboard
@@ -165,15 +185,25 @@ async fn watch_global_leaderboard_job(
 
                         // TODO: replace with function that sends message to matterbridge
                         for hero in heroes {
-                            sender.send(MyEvent {
+                            match sender.send(MyEvent {
                                 event: format!("HERO made the leaderboard: {}", hero.name),
-                            });
+                            }) {
+                                Ok(_) => {
+                                    // wonderful, nothing to add
+                                }
+                                Err(e) => {
+                                    let error = BotError::ChannelSend(format!(
+                                        "Could not send message to MPSC channel. {e}"
+                                    ));
+                                    error!("{error}");
+                                }
+                            };
                         }
                     }
                     Err(e) => {
                         let error =
                             BotError::AOC(format!("Could not scrape global leaderboard. {e}"));
-                        error!("{}", error);
+                        error!("{error}");
                     }
                 };
 

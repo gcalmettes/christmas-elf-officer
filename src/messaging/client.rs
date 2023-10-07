@@ -1,3 +1,4 @@
+use crate::error::{BotError, BotResult};
 use crate::messaging::models::MyEvent;
 use http::StatusCode;
 use slack_morphism::{
@@ -63,7 +64,8 @@ fn test_error_handler(
     _client: Arc<SlackHyperClient>,
     _states: SlackClientEventsUserState,
 ) -> StatusCode {
-    error!("{:#?}", err);
+    let error = BotError::Slack(err.to_string());
+    error!("{error}");
 
     // This return value should be OK if we want to return successful ack to the Slack server using Web-sockets
     // https://api.slack.com/apis/connections/socket-implement#acknowledge
@@ -106,29 +108,38 @@ pub async fn initialize_messaging(
     mut rx: UnboundedReceiver<MyEvent>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let client = Arc::new(SlackClient::new(SlackClientHyperConnector::new()));
+    let client_clone = client.clone();
 
-    let client2 = client.clone();
-    // Handle posting message from internal aoc events
+    // Bot announcements.
     tokio::spawn(async move {
         while let Some(message) = rx.recv().await {
-            println!("Your message event: {:?}", message); // This is where you handle everything one by one now
+            // TODO: get slack channel name or id by config/settings
+            // TODO: get other app env vars by config/settings
             let channel_id = SlackChannelId("C01T7GWLAVB".to_string());
             let app_token_value: SlackApiTokenValue =
                 config_env_var("SLACK_TEST_TOKEN").unwrap().into();
             let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
-            let session = client2.open_session(&app_token);
+            let session = client_clone.open_session(&app_token);
             let response_text = format!(":tada: {}", message.event);
 
             let response = SlackApiChatPostMessageRequest::new(
                 channel_id,
                 SlackMessageContent::new().with_text(response_text),
             );
-            let _s = session.chat_post_message(&response).await.map_err(|_| {});
+            // let _s = session.chat_post_message(&response).await.map_err(|_| {});
+            match session.chat_post_message(&response).await {
+                Ok(_) => {}
+                Err(e) => {
+                    let error = BotError::Slack(e.to_string());
+                    error!("{error}");
+                }
+            };
         }
     });
 
-    // Handle message from users
+    // Handle messages from users
     client_with_socket_mode(client.clone()).await?;
+
     Ok(())
 }
 
