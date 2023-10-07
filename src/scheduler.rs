@@ -1,17 +1,21 @@
 use tokio_cron_scheduler::{Job, JobScheduler};
 
 use std::time::Duration;
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::time;
+use tracing::{error, info};
 
 use std::sync::Arc;
 
 use crate::aoc::client::AoC;
 use crate::error::{BotError, BotResult};
+use crate::messaging::models::MyEvent;
 use crate::storage::MemoryCache;
 
 pub struct Scheduler {
     scheduler: JobScheduler,
     cache: MemoryCache,
+    sender: Arc<UnboundedSender<MyEvent>>, // communication to messaging service
 }
 
 pub enum JobProcess<'schedule> {
@@ -21,10 +25,14 @@ pub enum JobProcess<'schedule> {
 }
 
 impl Scheduler {
-    pub async fn new() -> BotResult<Self> {
+    pub async fn new(sender: Arc<UnboundedSender<MyEvent>>) -> BotResult<Self> {
         let cache = MemoryCache::new();
         let scheduler = JobScheduler::new().await?;
-        Ok(Scheduler { scheduler, cache })
+        Ok(Scheduler {
+            scheduler,
+            cache,
+            sender,
+        })
     }
 
     pub async fn add_job(&self, job_process: JobProcess<'_>) -> BotResult<uuid::Uuid> {
@@ -33,10 +41,12 @@ impl Scheduler {
                 initialize_private_leaderboard_job(self.cache.clone()).await?
             }
             JobProcess::UpdatePrivateLeaderboard(schedule) => {
-                update_private_leaderboard_job(schedule, self.cache.clone()).await?
+                update_private_leaderboard_job(schedule, self.cache.clone(), self.sender.clone())
+                    .await?
             }
             JobProcess::WatchGlobalLeaderboard(schedule) => {
-                watch_global_leaderboard_job(schedule, self.cache.clone()).await?
+                watch_global_leaderboard_job(schedule, self.cache.clone(), self.sender.clone())
+                    .await?
             }
         };
         Ok(self.scheduler.add(job).await?)
@@ -72,7 +82,7 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
                 }
                 Err(e) => {
                     let error = BotError::AOC(format!("Could not scrape leaderboard. {e}"));
-                    eprintln!("{}", error);
+                    error!("{}", error);
                 }
             };
         })
@@ -80,36 +90,49 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
     Ok(job)
 }
 
-async fn update_private_leaderboard_job(schedule: &str, cache: MemoryCache) -> BotResult<Job> {
+async fn update_private_leaderboard_job(
+    schedule: &str,
+    cache: MemoryCache,
+    sender: Arc<UnboundedSender<MyEvent>>,
+) -> BotResult<Job> {
     let job = Job::new_async(schedule, move |uuid, mut l| {
         let cache = cache.clone();
+        let sender = sender.clone();
         Box::pin(async move {
             let aoc_client = AoC::new();
             match aoc_client.private_leaderboard(2022).await {
                 Ok(scraped_leaderboard) => {
                     let mut data = cache.data.lock().unwrap();
                     *data = scraped_leaderboard;
+                    sender.send(MyEvent {
+                        event: "private updated!".to_string(),
+                    });
                 }
                 Err(e) => {
                     let error = BotError::AOC(format!("Could not scrape leaderboard. {e}"));
-                    eprintln!("{}", error);
+                    error!("{}", error);
                 }
             };
 
             // Query the next execution time for this job
             let next_tick = l.next_tick_for_job(uuid).await;
             match next_tick {
-                Ok(Some(ts)) => println!(">> Next refresh leaderboard at {:?}", ts),
-                _ => println!(">> Could not get next tick for refresh leaderboard job"),
+                Ok(Some(ts)) => info!("Next refresh for private leaderboard at {:?}", ts),
+                _ => error!("Could not get next tick for refresh private leaderboard job"),
             }
         })
     })?;
     Ok(job)
 }
 
-async fn watch_global_leaderboard_job(schedule: &str, cache: MemoryCache) -> BotResult<Job> {
+async fn watch_global_leaderboard_job(
+    schedule: &str,
+    cache: MemoryCache,
+    sender: Arc<UnboundedSender<MyEvent>>,
+) -> BotResult<Job> {
     let job = Job::new_async(schedule, move |uuid, mut l| {
         let cache = cache.clone();
+        let sender = sender.clone();
 
         Box::pin(async move {
             let aoc_client = AoC::new();
@@ -119,12 +142,21 @@ async fn watch_global_leaderboard_job(schedule: &str, cache: MemoryCache) -> Bot
 
             let mut global_leaderboard_is_complete = false;
             while !global_leaderboard_is_complete {
-                println!("GLobal leaderboard not complete");
+                info!("GLobal leaderboard not complete");
                 //TODO: Set year and day programmatically from Utc::now()
                 match aoc_client.global_leaderboard(2022, 1).await {
                     Ok(scraped_leaderboard) => {
-                        println!("is complete {}", scraped_leaderboard.is_complete());
+                        info!(
+                            "Global Leaderboard is complete {}",
+                            scraped_leaderboard.is_complete()
+                        );
                         global_leaderboard_is_complete = scraped_leaderboard.is_complete();
+
+                        if global_leaderboard_is_complete {
+                            sender.send(MyEvent {
+                                event: "Global Leaderboard Complete!".to_string(),
+                            });
+                        }
 
                         // check if private members made it to the global leaderboard
                         let private_leaderboard = cache.data.lock().unwrap();
@@ -133,13 +165,15 @@ async fn watch_global_leaderboard_job(schedule: &str, cache: MemoryCache) -> Bot
 
                         // TODO: replace with function that sends message to matterbridge
                         for hero in heroes {
-                            println!("HERO made the leaderboard: {}", hero.name);
+                            sender.send(MyEvent {
+                                event: format!("HERO made the leaderboard: {}", hero.name),
+                            });
                         }
                     }
                     Err(e) => {
                         let error =
                             BotError::AOC(format!("Could not scrape global leaderboard. {e}"));
-                        eprintln!("{}", error);
+                        error!("{}", error);
                     }
                 };
 
