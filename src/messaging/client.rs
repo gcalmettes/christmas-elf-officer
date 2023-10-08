@@ -18,51 +18,45 @@ async fn push_events_socket_mode_function(
     client: Arc<SlackHyperClient>,
     _states: SlackClientEventsUserState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    match event.event {
-        SlackEventCallbackBody::Message(message) => {
-            match message.sender.bot_id {
-                Some(_) => {
-                    // message from bot, we ignore
-                }
-                None => {
-                    // message from user, alright, we respond
-                    // let channel = message.origin.channel.unwrap();
-                    if let (Some(content), Some(channel_id)) =
-                        (message.content, message.origin.channel)
-                    {
-                        if let Some(t) = content.text {
-                            // TODO: send a message to the queue wiht channel ID, ts, and
-                            // command. So the post messages (internal and external) are all
-                            // handled by same service. So we need the sender here.
-                            // Same example than on the issue sync ex
+    // Only watch Message events for now. To be switched to match cases if we want other behaviors
+    // on other event types.
+    if let SlackEventCallbackBody::Message(message) = event.event {
+        match message.sender.bot_id {
+            Some(_) => {
+                // Abort if message from bot
+                return Ok(());
+            }
+            None => {
+                // message from user, alright, we respond
+                // let channel = message.origin.channel.unwrap();
+                if let (Some(content), Some(channel_id)) = (message.content, message.origin.channel)
+                {
+                    if let Some(t) = content.text {
+                        // TODO: send a message to the queue wiht channel ID, ts, and
+                        // command. So the post messages (internal and external) are all
+                        // handled by same service. So we need the sender here.
+                        // Same example than on the issue sync ex
 
-                            info!(
-                                "Received message in channel id {channel_id}, checking if command"
-                            );
-                            let ts = message.origin.ts; // to respond in thread
-                            let app_token_value: SlackApiTokenValue =
-                                config_env_var("SLACK_TEST_TOKEN")?.into();
-                            let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
-                            let session = client.open_session(&app_token);
-                            let response_text = format!(":repeat: Received your query '{t}'");
+                        info!("Received message in channel id {channel_id}, checking if command");
+                        let ts = message.origin.ts; // to respond in thread
+                        let app_token_value: SlackApiTokenValue =
+                            config_env_var("SLACK_TEST_TOKEN")?.into();
+                        let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
+                        let session = client.open_session(&app_token);
+                        let response_text = format!(":repeat: Received your query '{t}'");
 
-                            let response = SlackApiChatPostMessageRequest::new(
-                                channel_id,
-                                SlackMessageContent::new().with_text(response_text),
-                            )
-                            .with_thread_ts(ts);
-                            session.chat_post_message(&response).await?;
-                        };
-                    }
+                        let response = SlackApiChatPostMessageRequest::new(
+                            channel_id,
+                            SlackMessageContent::new().with_text(response_text),
+                        )
+                        .with_thread_ts(ts);
+                        session.chat_post_message(&response).await?;
+                    };
                 }
             }
-            Ok(())
-        }
-        _ => {
-            // Not a message, ignoring
-            Ok(())
         }
     }
+    Ok(())
 }
 
 fn test_error_handler(
