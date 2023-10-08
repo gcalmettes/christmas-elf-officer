@@ -1,4 +1,4 @@
-use crate::error::{BotError, BotResult};
+use crate::error::BotError;
 use crate::messaging::models::MyEvent;
 use http::StatusCode;
 use slack_morphism::{
@@ -10,7 +10,7 @@ use slack_morphism::{
     SlackClientSocketModeListener, SlackMessageContent, SlackSocketModeListenerCallbacks,
 };
 use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::Receiver;
 use tracing::{error, info};
 
 async fn push_events_socket_mode_function(
@@ -105,7 +105,7 @@ pub fn config_env_var(name: &str) -> Result<String, String> {
 }
 
 pub async fn initialize_messaging(
-    mut rx: UnboundedReceiver<MyEvent>,
+    mut rx: Receiver<MyEvent>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let client = Arc::new(SlackClient::new(SlackClientHyperConnector::new()));
     let client_clone = client.clone();
@@ -139,4 +139,3 @@ pub async fn initialize_messaging(
 
     Ok(())
 }
-

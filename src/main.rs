@@ -17,7 +17,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed");
 
-    let (tx, mut rx) = mpsc::unbounded_channel::<MyEvent>();
+    // Capacity of 64 should be more than plenty to handle all the messages
+    let (tx, mut rx) = mpsc::channel::<MyEvent>(64);
 
     // Retrieve current minute to initialize schedule of private leaderbaord updates.
     // AoC API rules states to not fetch leaderboard at a frequency higher than 15min.
