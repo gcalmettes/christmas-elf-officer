@@ -1,10 +1,11 @@
 use ceo_bot::messaging::client::AoCSlackClient;
 use ceo_bot::messaging::models::Event;
 use ceo_bot::scheduler::{JobProcess, Scheduler};
+use ceo_bot::storage::MemoryCache;
 
 use tokio::sync::mpsc;
 
-use tokio::time::{sleep, Duration};
+// use tokio::time::{sleep, Duration};
 
 use chrono::{Timelike, Utc};
 use std::sync::Arc;
@@ -31,7 +32,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // At every 15th minute from (now_minute % 15) through 59.
     let private_leaderboard_schedule = format!("{} {}/15 * 1-25 12 *", now_second, now_minute % 15);
 
-    let sched = Scheduler::new(Arc::new(tx.clone())).await?;
+    // Initialize global cache
+    let cache = MemoryCache::new();
+
+    let sched = Scheduler::new(cache.clone(), Arc::new(tx.clone())).await?;
 
     let jobs = vec![
         JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
@@ -50,7 +54,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let slack_client = AoCSlackClient::new();
     // slack_client.listen_for_events(rx).await;
     // slack_client.start_slack_socket_mode().await?;
-    slack_client.handle_messages_and_events(tx, rx).await?;
+    slack_client
+        .handle_messages_and_events(cache, tx, rx)
+        .await?;
     // initialize_messaging(rx).await?;
 
     // loop {

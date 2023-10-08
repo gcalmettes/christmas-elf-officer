@@ -25,8 +25,8 @@ pub enum JobProcess<'schedule> {
 }
 
 impl Scheduler {
-    pub async fn new(sender: Arc<Sender<Event>>) -> BotResult<Self> {
-        let cache = MemoryCache::new();
+    pub async fn new(cache: MemoryCache, sender: Arc<Sender<Event>>) -> BotResult<Self> {
+        // let cache = MemoryCache::new();
         let scheduler = JobScheduler::new().await?;
         Ok(Scheduler {
             scheduler,
