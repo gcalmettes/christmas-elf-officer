@@ -27,26 +27,32 @@ async fn push_events_socket_mode_function(
                 None => {
                     // message from user, alright, we respond
                     // let channel = message.origin.channel.unwrap();
-                    match (message.content, message.origin.channel) {
-                        (Some(content), Some(channel_id)) => {
-                            if let Some(t) = content.text {
-                                info!("Received message in channel id {channel_id}, checking if command");
-                                let ts = message.origin.ts; // to respond in thread
-                                let app_token_value: SlackApiTokenValue =
-                                    config_env_var("SLACK_TEST_TOKEN")?.into();
-                                let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
-                                let session = client.open_session(&app_token);
-                                let response_text = format!(":repeat: Received your query '{t}'");
+                    if let (Some(content), Some(channel_id)) =
+                        (message.content, message.origin.channel)
+                    {
+                        if let Some(t) = content.text {
+                            // TODO: send a message to the queue wiht channel ID, ts, and
+                            // command. So the post messages (internal and external) are all
+                            // handled by same service. So we need the sender here.
+                            // Same example than on the issue sync ex
 
-                                let response = SlackApiChatPostMessageRequest::new(
-                                    channel_id,
-                                    SlackMessageContent::new().with_text(response_text),
-                                )
-                                .with_thread_ts(ts);
-                                session.chat_post_message(&response).await?;
-                            };
-                        }
-                        (_, _) => {}
+                            info!(
+                                "Received message in channel id {channel_id}, checking if command"
+                            );
+                            let ts = message.origin.ts; // to respond in thread
+                            let app_token_value: SlackApiTokenValue =
+                                config_env_var("SLACK_TEST_TOKEN")?.into();
+                            let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
+                            let session = client.open_session(&app_token);
+                            let response_text = format!(":repeat: Received your query '{t}'");
+
+                            let response = SlackApiChatPostMessageRequest::new(
+                                channel_id,
+                                SlackMessageContent::new().with_text(response_text),
+                            )
+                            .with_thread_ts(ts);
+                            session.chat_post_message(&response).await?;
+                        };
                     }
                 }
             }
@@ -127,12 +133,9 @@ pub async fn initialize_messaging(
                 SlackMessageContent::new().with_text(response_text),
             );
             // let _s = session.chat_post_message(&response).await.map_err(|_| {});
-            match session.chat_post_message(&response).await {
-                Ok(_) => {}
-                Err(e) => {
-                    let error = BotError::Slack(e.to_string());
-                    error!("{error}");
-                }
+            if let Err(e) = session.chat_post_message(&response).await {
+                let error = BotError::Slack(e.to_string());
+                error!("{error}");
             };
         }
     });

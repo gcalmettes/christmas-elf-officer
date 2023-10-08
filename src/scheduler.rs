@@ -104,18 +104,13 @@ async fn update_private_leaderboard_job(
                 Ok(scraped_leaderboard) => {
                     let mut data = cache.data.lock().unwrap();
                     *data = scraped_leaderboard;
-                    match sender.send(MyEvent {
+                    if let Err(e) = sender.send(MyEvent {
                         event: "private updated!".to_string(),
                     }) {
-                        Ok(_) => {
-                            // wonderful, nothing to add
-                        }
-                        Err(e) => {
-                            let error = BotError::ChannelSend(format!(
-                                "Could not send message to MPSC channel. {e}"
-                            ));
-                            error!("{error}");
-                        }
+                        let error = BotError::ChannelSend(format!(
+                            "Could not send message to MPSC channel. {e}"
+                        ));
+                        error!("{error}");
                     };
                 }
                 Err(e) => {
@@ -163,18 +158,13 @@ async fn watch_global_leaderboard_job(
                         global_leaderboard_is_complete = scraped_leaderboard.is_complete();
 
                         if global_leaderboard_is_complete {
-                            match sender.send(MyEvent {
+                            if let Err(e) = sender.send(MyEvent {
                                 event: "Global Leaderboard Complete!".to_string(),
                             }) {
-                                Ok(_) => {
-                                    // wonderful, nothing to add
-                                }
-                                Err(e) => {
-                                    let error = BotError::ChannelSend(format!(
-                                        "Could not send message to MPSC channel. {e}"
-                                    ));
-                                    error!("{error}");
-                                }
+                                let error = BotError::ChannelSend(format!(
+                                    "Could not send message to MPSC channel. {e}"
+                                ));
+                                error!("{error}");
                             };
                         }
 
@@ -185,18 +175,13 @@ async fn watch_global_leaderboard_job(
 
                         // TODO: replace with function that sends message to matterbridge
                         for hero in heroes {
-                            match sender.send(MyEvent {
+                            if let Err(e) = sender.send(MyEvent {
                                 event: format!("HERO made the leaderboard: {}", hero.name),
                             }) {
-                                Ok(_) => {
-                                    // wonderful, nothing to add
-                                }
-                                Err(e) => {
-                                    let error = BotError::ChannelSend(format!(
-                                        "Could not send message to MPSC channel. {e}"
-                                    ));
-                                    error!("{error}");
-                                }
+                                let error = BotError::ChannelSend(format!(
+                                    "Could not send message to MPSC channel. {e}"
+                                ));
+                                error!("{error}");
                             };
                         }
                     }
@@ -209,59 +194,6 @@ async fn watch_global_leaderboard_job(
 
                 interval.tick().await;
             }
-
-            ////TODO: Set year and day programmatically from Utc::now()
-            //match aoc_client.global_leaderboard(2022, 1).await {
-            //    Ok(scraped_leaderboard) => {
-            //        // check if private members made it to the global leaderboard
-            //        let private_leaderboard = cache.data.lock().unwrap();
-            //        let heroes = scraped_leaderboard
-            //            .look_for_private_members(&private_leaderboard.leaderboard);
-
-            //        // TODO: replace with function that sends message to matterbridge
-            //        for hero in heroes {
-            //            println!("HERO made the leaderboard: {}", hero.name);
-            //        }
-
-            //        // println!(
-            //        //     ">> {:?} [{:?}]",
-            //        //     scraped_leaderboard.len(),
-            //        //     scraped_leaderboard.is_complete()
-            //        // );
-
-            //        // let deltas_min = scraped_leaderboard.get_fastest_delta();
-            //        // let deltas_max = scraped_leaderboard.get_slowest_delta();
-            //        // println!(">> DELTAS: {:?}, {:?}", deltas_min, deltas_max);
-
-            //        // let mut data = cache.data.lock().unwrap();
-            //        // *data = scraped_leaderboard;
-            //    }
-            //    Err(e) => {
-            //        let error = BotError::AOC(format!("Could not scrape global leaderboard. {e}"));
-            //        eprintln!("{}", error);
-            //    }
-            //};
-
-            // let mut interval = time::interval(Duration::from_secs(1));
-
-            // let mut complete = false;
-            // let mut counter = 0;
-            // while !complete {
-            //     interval.tick().await;
-            //     println!("not complete yet");
-            //     counter += 1;
-            //     if counter > 5 {
-            //         complete = true;
-            //         println!("Complete !!");
-            //     }
-            // }
-
-            // // Query the next execution time for this job
-            // let next_tick = l.next_tick_for_job(uuid).await;
-            // match next_tick {
-            //     Ok(Some(ts)) => println!(">> Next refresh leaderboard at {:?}", ts),
-            //     _ => println!(">> Could not get next tick for refresh leaderboard job"),
-            // }
         })
     })?;
     Ok(job)
