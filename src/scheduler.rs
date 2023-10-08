@@ -9,13 +9,13 @@ use std::sync::Arc;
 
 use crate::aoc::client::AoC;
 use crate::error::{BotError, BotResult};
-use crate::messaging::models::MyEvent;
+use crate::messaging::models::Event;
 use crate::storage::MemoryCache;
 
 pub struct Scheduler {
     scheduler: JobScheduler,
     cache: MemoryCache,
-    sender: Arc<Sender<MyEvent>>, // communication to messaging service
+    sender: Arc<Sender<Event>>, // communication to messaging service
 }
 
 pub enum JobProcess<'schedule> {
@@ -25,7 +25,7 @@ pub enum JobProcess<'schedule> {
 }
 
 impl Scheduler {
-    pub async fn new(sender: Arc<Sender<MyEvent>>) -> BotResult<Self> {
+    pub async fn new(sender: Arc<Sender<Event>>) -> BotResult<Self> {
         let cache = MemoryCache::new();
         let scheduler = JobScheduler::new().await?;
         Ok(Scheduler {
@@ -93,7 +93,7 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
 async fn update_private_leaderboard_job(
     schedule: &str,
     cache: MemoryCache,
-    sender: Arc<Sender<MyEvent>>,
+    sender: Arc<Sender<Event>>,
 ) -> BotResult<Job> {
     let job = Job::new_async(schedule, move |uuid, mut l| {
         let cache = cache.clone();
@@ -107,12 +107,7 @@ async fn update_private_leaderboard_job(
                         let mut data = cache.data.lock().unwrap();
                         *data = scraped_leaderboard;
                     }
-                    if let Err(e) = sender
-                        .send(MyEvent {
-                            event: "private updated!".to_string(),
-                        })
-                        .await
-                    {
+                    if let Err(e) = sender.send(Event::PrivateLeaderboardUpdated).await {
                         let error = BotError::ChannelSend(format!(
                             "Could not send message to MPSC channel. {e}"
                         ));
@@ -139,7 +134,7 @@ async fn update_private_leaderboard_job(
 async fn watch_global_leaderboard_job(
     schedule: &str,
     cache: MemoryCache,
-    sender: Arc<Sender<MyEvent>>,
+    sender: Arc<Sender<Event>>,
 ) -> BotResult<Job> {
     let job = Job::new_async(schedule, move |uuid, mut l| {
         let cache = cache.clone();
@@ -164,12 +159,7 @@ async fn watch_global_leaderboard_job(
                         global_leaderboard_is_complete = scraped_leaderboard.is_complete();
 
                         if global_leaderboard_is_complete {
-                            if let Err(e) = sender
-                                .send(MyEvent {
-                                    event: "Global Leaderboard Complete!".to_string(),
-                                })
-                                .await
-                            {
+                            if let Err(e) = sender.send(Event::GlobalLeaderboardComplete).await {
                                 let error = BotError::ChannelSend(format!(
                                     "Could not send message to MPSC channel. {e}"
                                 ));
@@ -188,9 +178,7 @@ async fn watch_global_leaderboard_job(
                         // TODO: replace with function that sends message to matterbridge
                         for hero in heroes {
                             if let Err(e) = sender
-                                .send(MyEvent {
-                                    event: format!("HERO made the leaderboard: {}", hero.name),
-                                })
+                                .send(Event::GlobalLeaderboardHeroFound(hero.name))
                                 .await
                             {
                                 let error = BotError::ChannelSend(format!(

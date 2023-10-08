@@ -1,8 +1,10 @@
-use ceo_bot::messaging::client::initialize_messaging;
-use ceo_bot::messaging::models::MyEvent;
+use ceo_bot::messaging::client::AoCSlackClient;
+use ceo_bot::messaging::models::Event;
 use ceo_bot::scheduler::{JobProcess, Scheduler};
 
 use tokio::sync::mpsc;
+
+use tokio::time::{sleep, Duration};
 
 use chrono::{Timelike, Utc};
 use std::sync::Arc;
@@ -18,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed");
 
     // Capacity of 64 should be more than plenty to handle all the messages
-    let (tx, mut rx) = mpsc::channel::<MyEvent>(64);
+    let (tx, mut rx) = mpsc::channel::<Event>(64);
 
     // Retrieve current minute to initialize schedule of private leaderbaord updates.
     // AoC API rules states to not fetch leaderboard at a frequency higher than 15min.
@@ -29,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // At every 15th minute from (now_minute % 15) through 59.
     let private_leaderboard_schedule = format!("{} {}/15 * 1-25 12 *", now_second, now_minute % 15);
 
-    let sched = Scheduler::new(Arc::new(tx)).await?;
+    let sched = Scheduler::new(Arc::new(tx.clone())).await?;
 
     let jobs = vec![
         JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
@@ -45,7 +47,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     sched.start().await?;
 
     info!("Initializing messaging engine.");
-    initialize_messaging(rx).await?;
+    let slack_client = AoCSlackClient::new();
+    // slack_client.listen_for_events(rx).await;
+    // slack_client.start_slack_socket_mode().await?;
+    slack_client.handle_messages_and_events(tx, rx).await?;
+    // initialize_messaging(rx).await?;
 
+    // loop {
+    //     sleep(Duration::from_millis(5000)).await;
+    // }
     Ok(())
 }

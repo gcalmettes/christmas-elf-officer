@@ -1,5 +1,5 @@
 use crate::error::BotError;
-use crate::messaging::models::MyEvent;
+use crate::messaging::models::{Command, Event};
 use http::StatusCode;
 use slack_morphism::{
     api::SlackApiChatPostMessageRequest,
@@ -10,56 +10,146 @@ use slack_morphism::{
     SlackClientSocketModeListener, SlackMessageContent, SlackSocketModeListenerCallbacks,
 };
 use std::sync::Arc;
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::{error, info};
 
-async fn push_events_socket_mode_function(
-    event: SlackPushEventCallback,
+pub struct AoCSlackClient {
     client: Arc<SlackHyperClient>,
-    _states: SlackClientEventsUserState,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Only watch Message events for now. To be switched to match cases if we want other behaviors
-    // on other event types.
-    if let SlackEventCallbackBody::Message(message) = event.event {
-        match message.sender.bot_id {
-            Some(_) => {
-                // Abort if message from bot
-                return Ok(());
-            }
-            None => {
-                // message from user, alright, we respond
-                // let channel = message.origin.channel.unwrap();
-                if let (Some(content), Some(channel_id)) = (message.content, message.origin.channel)
-                {
-                    if let Some(t) = content.text {
-                        // TODO: send a message to the queue wiht channel ID, ts, and
-                        // command. So the post messages (internal and external) are all
-                        // handled by same service. So we need the sender here.
-                        // Same example than on the issue sync ex
+}
 
-                        info!("Received message in channel id {channel_id}, checking if command");
-                        let ts = message.origin.ts; // to respond in thread
-                        let app_token_value: SlackApiTokenValue =
-                            config_env_var("SLACK_TEST_TOKEN")?.into();
-                        let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
-                        let session = client.open_session(&app_token);
-                        let response_text = format!(":repeat: Received your query '{t}'");
+pub struct MyEnvironment {
+    pub sender: Arc<Sender<Event>>,
+}
 
-                        let response = SlackApiChatPostMessageRequest::new(
+impl AoCSlackClient {
+    pub fn new() -> Self {
+        let client = Arc::new(SlackClient::new(SlackClientHyperConnector::new()));
+        Self { client }
+    }
+
+    pub async fn handle_messages_and_events(
+        &self,
+        tx: Sender<Event>,
+        rx: Receiver<Event>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        self.listen_for_events(rx).await;
+        self.start_slack_client_with_socket_mode(tx).await?;
+        Ok(())
+    }
+
+    // Spaw listener for events and post corresponding annoucements/messages
+    async fn listen_for_events(&self, mut rx: Receiver<Event>) {
+        let client = self.client.clone();
+
+        tokio::spawn(async move {
+            while let Some(event) = rx.recv().await {
+                // TODO: get slack channel name or id by config/settings
+                // TODO: get other app env vars by config/settings
+
+                let channel_id = SlackChannelId("C01T7GWLAVB".to_string());
+                let app_token_value: SlackApiTokenValue =
+                    config_env_var("SLACK_TEST_TOKEN").unwrap().into();
+                let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
+                let session = client.open_session(&app_token);
+
+                let response_text = event.to_string();
+
+                let response = match event {
+                    Event::CommandReceived(channel_id, thread_ts, _cmd) => {
+                        SlackApiChatPostMessageRequest::new(
                             channel_id,
                             SlackMessageContent::new().with_text(response_text),
                         )
-                        .with_thread_ts(ts);
-                        session.chat_post_message(&response).await?;
+                        .with_thread_ts(thread_ts)
+                    }
+                    _ => SlackApiChatPostMessageRequest::new(
+                        channel_id,
+                        SlackMessageContent::new().with_text(response_text),
+                    ),
+                };
+
+                if let Err(e) = session.chat_post_message(&response).await {
+                    let error = BotError::Slack(e.to_string());
+                    error!("{error}");
+                };
+            }
+        });
+    }
+
+    async fn start_slack_client_with_socket_mode(
+        &self,
+        tx: Sender<Event>,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let socket_mode_callbacks = SlackSocketModeListenerCallbacks::new()
+            .with_push_events(push_events_socket_mode_function);
+
+        let listener_environment = Arc::new(
+            SlackClientEventsListenerEnvironment::new(self.client.clone())
+                .with_error_handler(error_handler)
+                .with_user_state(MyEnvironment {
+                    sender: Arc::new(tx),
+                }),
+        );
+
+        let socket_mode_listener = SlackClientSocketModeListener::new(
+            &SlackClientSocketModeConfig::new(),
+            listener_environment.clone(),
+            socket_mode_callbacks,
+        );
+
+        let app_token_value: SlackApiTokenValue = config_env_var("SLACK_TEST_APP_TOKEN")?.into();
+        let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
+
+        socket_mode_listener.listen_for(&app_token).await?;
+
+        socket_mode_listener.serve().await;
+
+        Ok(())
+    }
+}
+
+async fn push_events_socket_mode_function(
+    event: SlackPushEventCallback,
+    _client: Arc<SlackHyperClient>,
+    states: SlackClientEventsUserState,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    if let SlackEventCallbackBody::Message(message) = event.event {
+        match message.sender.bot_id {
+            Some(_) => {
+                // Message from bot, ignore
+            }
+            None => {
+                // message from user, we will handle it if there is content and channel_id
+                if let (Some(content), Some(channel_id)) = (message.content, message.origin.channel)
+                {
+                    if let Some(t) = content.text {
+                        // TODO: Here we need to match commands by parsing t and if recognized command we sent
+                        // an event so it can be processed.
+
+                        let thread_ts = message.origin.ts; // to respond in thread
+
+                        let states = states.read().await;
+                        let state: Option<&MyEnvironment> =
+                            states.get_user_state::<MyEnvironment>();
+                        if let Some(env) = state {
+                            let sender = env.sender.clone();
+
+                            if let Err(e) = sender
+                                .send(Event::CommandReceived(channel_id, thread_ts, Command::Help))
+                                .await
+                            {
+                                error!("{}", e);
+                            };
+                        };
                     };
-                }
+                };
             }
         }
-    }
+    };
     Ok(())
 }
 
-fn test_error_handler(
+fn error_handler(
     err: Box<dyn std::error::Error + Send + Sync>,
     _client: Arc<SlackHyperClient>,
     _states: SlackClientEventsUserState,
@@ -80,8 +170,7 @@ pub async fn client_with_socket_mode(
         SlackSocketModeListenerCallbacks::new().with_push_events(push_events_socket_mode_function);
 
     let listener_environment = Arc::new(
-        SlackClientEventsListenerEnvironment::new(client.clone())
-            .with_error_handler(test_error_handler),
+        SlackClientEventsListenerEnvironment::new(client.clone()).with_error_handler(error_handler),
     );
 
     let socket_mode_listener = SlackClientSocketModeListener::new(
@@ -102,40 +191,4 @@ pub async fn client_with_socket_mode(
 
 pub fn config_env_var(name: &str) -> Result<String, String> {
     std::env::var(name).map_err(|e| format!("{}: {}", name, e))
-}
-
-pub async fn initialize_messaging(
-    mut rx: Receiver<MyEvent>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let client = Arc::new(SlackClient::new(SlackClientHyperConnector::new()));
-    let client_clone = client.clone();
-
-    // Bot announcements.
-    tokio::spawn(async move {
-        while let Some(message) = rx.recv().await {
-            // TODO: get slack channel name or id by config/settings
-            // TODO: get other app env vars by config/settings
-            let channel_id = SlackChannelId("C01T7GWLAVB".to_string());
-            let app_token_value: SlackApiTokenValue =
-                config_env_var("SLACK_TEST_TOKEN").unwrap().into();
-            let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
-            let session = client_clone.open_session(&app_token);
-            let response_text = format!(":tada: {}", message.event);
-
-            let response = SlackApiChatPostMessageRequest::new(
-                channel_id,
-                SlackMessageContent::new().with_text(response_text),
-            );
-            // let _s = session.chat_post_message(&response).await.map_err(|_| {});
-            if let Err(e) = session.chat_post_message(&response).await {
-                let error = BotError::Slack(e.to_string());
-                error!("{error}");
-            };
-        }
-    });
-
-    // Handle messages from users
-    client_with_socket_mode(client.clone()).await?;
-
-    Ok(())
 }
