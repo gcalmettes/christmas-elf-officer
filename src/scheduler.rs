@@ -8,6 +8,7 @@ use tracing::{error, info};
 use std::sync::Arc;
 
 use crate::aoc::client::AoC;
+use crate::aoc::leaderboard::Identifier;
 use crate::error::{BotError, BotResult};
 use crate::messaging::models::Event;
 use crate::storage::MemoryCache;
@@ -146,14 +147,19 @@ async fn watch_global_leaderboard_job(
             //TODO: set interval to what we want
             let mut interval = time::interval(Duration::from_secs(3));
 
+            //TODO: Set year and day programmatically from Utc::now()
+            let (year, day) = (2022, 9);
+
+            let mut known_heroes: Vec<Identifier> = vec![];
+
             let mut global_leaderboard_is_complete = false;
             while !global_leaderboard_is_complete {
                 info!("GLobal leaderboard not complete");
-                //TODO: Set year and day programmatically from Utc::now()
-                match aoc_client.global_leaderboard(2022, 10).await {
+                match aoc_client.global_leaderboard(year, day).await {
                     Ok(scraped_leaderboard) => {
                         info!(
-                            "Global Leaderboard is complete {}",
+                            "Global Leaderboard for day {} is complete {}",
+                            day,
                             scraped_leaderboard.is_complete()
                         );
                         global_leaderboard_is_complete = scraped_leaderboard.is_complete();
@@ -172,20 +178,26 @@ async fn watch_global_leaderboard_job(
                             // check if private members made it to the global leaderboard
                             let private_leaderboard = cache.data.lock().unwrap();
                             scraped_leaderboard
-                                .look_for_private_members(&private_leaderboard.leaderboard)
+                                .check_for_private_members(&private_leaderboard.leaderboard)
                         };
 
                         // TODO: replace with function that sends message to matterbridge
                         for hero in heroes {
-                            if let Err(e) = sender
-                                .send(Event::GlobalLeaderboardHeroFound(hero.name))
-                                .await
-                            {
-                                let error = BotError::ChannelSend(format!(
-                                    "Could not send message to MPSC channel. {e}"
-                                ));
-                                error!("{error}");
-                            };
+                            // If not already known, send shoutout to hero
+                            if !known_heroes.contains(&hero) {
+                                if let Err(e) = sender
+                                    .send(Event::GlobalLeaderboardHeroFound(hero.name.clone()))
+                                    .await
+                                {
+                                    let error = BotError::ChannelSend(format!(
+                                        "Could not send message to MPSC channel. {e}"
+                                    ));
+                                    error!("{error}");
+                                } else {
+                                    // Announcement successful, let's register the hero.
+                                    known_heroes.push(hero);
+                                };
+                            }
                         }
                     }
                     Err(e) => {

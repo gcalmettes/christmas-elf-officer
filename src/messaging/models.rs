@@ -65,7 +65,7 @@ impl fmt::Display for Event {
             Event::GlobalLeaderboardHeroFound(hero) => {
                 write!(
                     f,
-                    ":tada: Our own {} made it to the global leaderboard !",
+                    ":tada: Our very own {} made it to the global leaderboard !",
                     hero
                 )
             }

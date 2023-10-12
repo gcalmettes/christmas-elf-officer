@@ -347,7 +347,7 @@ impl GlobalLeaderboard {
         self.sorted_deltas().last()
     }
 
-    pub fn look_for_private_members(
+    pub fn check_for_private_members(
         &self,
         private_leaderboard: &PrivateLeaderboard,
     ) -> Vec<Identifier> {
@@ -365,8 +365,6 @@ impl GlobalLeaderboard {
             .collect::<Vec<Identifier>>();
         heroes
     }
-    //TODO:
-    // check_heroes
 }
 
 impl Deref for GlobalLeaderboard {
