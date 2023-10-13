@@ -38,10 +38,10 @@ pub struct ScrapedPrivateLeaderboard {
     pub leaderboard: PrivateLeaderboard,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GlobalLeaderboard(pub GlobalLeaderboardEntryVec);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct GlobalLeaderboardEntry {
     pub id: u64,
     pub rank: u8,
@@ -248,18 +248,17 @@ impl GlobalLeaderboard {
     }
 
     // global entries with addition of part (1|2) label
-    fn labeled_entries(&self) -> Vec<(u64, chrono::Duration, usize)> {
+    fn labeled_entries(&self) -> Vec<(u64, chrono::Duration, usize, u8)> {
         self.sorted_ranks()
             .flat_map(|(_r, p1, p2)| {
-                [p1, p2]
-                    .into_iter()
-                    .enumerate()
-                    .filter_map(|(part, s)| s.map_or(None, |t| Some((t.id, t.time, part + 1))))
+                [p1, p2].into_iter().enumerate().filter_map(|(part, s)| {
+                    s.map_or(None, |t| Some((t.id, t.time, part + 1, t.rank)))
+                })
             })
             .collect()
     }
 
-    fn sorted_deltas(&self) -> std::vec::IntoIter<Duration> {
+    fn sorted_deltas(&self) -> std::vec::IntoIter<(Duration, u8)> {
         let labeled_solves = self.labeled_entries();
 
         // Needed for computation of deltas for members who only scored one part of the global
@@ -295,7 +294,11 @@ impl GlobalLeaderboard {
                     chronologically_ordered.next(),
                 ) {
                     (Some(solve_first_part), Some(solve_second_part)) => {
-                        solve_second_part.1 - solve_first_part.1
+                        // (delta, final rank for second part)
+                        (
+                            solve_second_part.1 - solve_first_part.1,
+                            solve_second_part.3,
+                        )
                     }
                     (Some(solve), None) => {
                         match solve.2 {
@@ -303,12 +306,18 @@ impl GlobalLeaderboard {
                                 // Scored only first part, second part overtime.
                                 // Duration is > (max second part - part.1), so we'll add 1 to the
                                 // diff as we have no way to know exactly
-                                max_time_for_second_part - solve.1 + Duration::seconds(1)
+                                (
+                                    max_time_for_second_part - solve.1 + Duration::seconds(1),
+                                    101,
+                                )
                             }
                             2 => {
                                 // Overtimed on first part, but came by strong to score second part
                                 // Duration is > (part.1, - max first part). We'll substract 1 sec.
-                                solve.1 - max_time_for_first_part - Duration::seconds(1)
+                                (
+                                    solve.1 - max_time_for_first_part - Duration::seconds(1),
+                                    solve.3,
+                                )
                             }
                             _ => unreachable!(),
                         }
@@ -318,6 +327,78 @@ impl GlobalLeaderboard {
             })
             .sorted()
     }
+
+    // // global entries with addition of part (1|2) label
+    // fn labeled_entries(&self) -> Vec<(u64, chrono::Duration, usize)> {
+    //     self.sorted_ranks()
+    //         .flat_map(|(_r, p1, p2)| {
+    //             [p1, p2]
+    //                 .into_iter()
+    //                 .enumerate()
+    //                 .filter_map(|(part, s)| s.map_or(None, |t| Some((t.id, t.time, part + 1))))
+    //         })
+    //         .collect()
+    // }
+
+    // fn sorted_deltas(&self) -> std::vec::IntoIter<Duration> {
+    //     let labeled_solves = self.labeled_entries();
+
+    //     // Needed for computation of deltas for members who only scored one part of the global
+    //     // leaderboard that day.
+    //     let (max_time_for_first_part, max_time_for_second_part) =
+    //         labeled_solves.clone().iter().fold(
+    //             (Duration::milliseconds(0), Duration::milliseconds(0)),
+    //             |mut acc, entry| match entry.2 {
+    //                 1 => {
+    //                     if entry.1 > acc.0 {
+    //                         acc.0 = entry.1
+    //                     };
+    //                     acc
+    //                 }
+    //                 2 => {
+    //                     if entry.1 > acc.1 {
+    //                         acc.1 = entry.1
+    //                     };
+    //                     acc
+    //                 }
+    //                 // only two parts for each problem
+    //                 _ => unreachable!(),
+    //             },
+    //         );
+
+    //     let by_id = labeled_solves.iter().into_group_map_by(|e| e.0);
+    //     by_id
+    //         .into_iter()
+    //         .map(|(_id, times)| {
+    //             let mut chronologically_ordered = times.into_iter().sorted();
+    //             match (
+    //                 chronologically_ordered.next(),
+    //                 chronologically_ordered.next(),
+    //             ) {
+    //                 (Some(solve_first_part), Some(solve_second_part)) => {
+    //                     solve_second_part.1 - solve_first_part.1
+    //                 }
+    //                 (Some(solve), None) => {
+    //                     match solve.2 {
+    //                         1 => {
+    //                             // Scored only first part, second part overtime.
+    //                             // Duration is > (max second part - part.1), so we'll add 1 to the
+    //                             // diff as we have no way to know exactly
+    //                             max_time_for_second_part - solve.1 + Duration::seconds(1)
+    //                         }
+    //                         2 => {
+    //                             // Overtimed on first part, but came by strong to score second part
+    //                             // Duration is > (part.1, - max first part). We'll substract 1 sec.
+    //                             solve.1 - max_time_for_first_part - Duration::seconds(1)
+    //                         }
+    //                         _ => unreachable!(),
+    //                     }
+    //                 }
+    //                 (_, _) => unreachable!(),
+    //             }
+    //         })
+    //         .sorted()
+    // }
 
     pub fn get_fastest_times(
         &self,
@@ -339,13 +420,24 @@ impl GlobalLeaderboard {
         self.sorted_ranks().last()
     }
 
-    pub fn get_fastest_delta(&self) -> Option<Duration> {
+    pub fn get_fastest_delta(&self) -> Option<(Duration, u8)> {
         self.sorted_deltas().next()
     }
 
-    pub fn get_slowest_delta(&self) -> Option<Duration> {
-        self.sorted_deltas().last()
+    pub fn get_slowest_delta(&self) -> Option<(Duration, u8)> {
+        // only keep people who finished in top 100 of part 2
+        self.sorted_deltas()
+            .filter(|(_duration, rank)| rank <= &100)
+            .last()
     }
+
+    // pub fn get_fastest_delta(&self) -> Option<Duration> {
+    //     self.sorted_deltas().next()
+    // }
+
+    // pub fn get_slowest_delta(&self) -> Option<Duration> {
+    //     self.sorted_deltas().last()
+    // }
 
     pub fn check_for_private_members(
         &self,

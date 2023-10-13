@@ -1,8 +1,8 @@
-use tokio_cron_scheduler::{Job, JobScheduler};
-
+use chrono::{Datelike, Utc};
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::time;
+use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{error, info};
 
 use std::sync::Arc;
@@ -21,6 +21,7 @@ pub struct Scheduler {
 
 pub enum JobProcess<'schedule> {
     InitializePrivateLeaderboard,
+    InitializeDailySolutionsThread(&'schedule str),
     UpdatePrivateLeaderboard(&'schedule str),
     WatchGlobalLeaderboard(&'schedule str),
 }
@@ -40,6 +41,9 @@ impl Scheduler {
         let job = match job_process {
             JobProcess::InitializePrivateLeaderboard => {
                 initialize_private_leaderboard_job(self.cache.clone()).await?
+            }
+            JobProcess::InitializeDailySolutionsThread(schedule) => {
+                initialize_daily_solutions_thread_job(schedule, self.sender.clone()).await?
             }
             JobProcess::UpdatePrivateLeaderboard(schedule) => {
                 update_private_leaderboard_job(schedule, self.cache.clone(), self.sender.clone())
@@ -85,6 +89,28 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
                     let error = BotError::AOC(format!("Could not scrape leaderboard. {e}"));
                     error!("{error}");
                 }
+            };
+        })
+    })?;
+    Ok(job)
+}
+
+async fn initialize_daily_solutions_thread_job(
+    schedule: &str,
+    sender: Arc<Sender<Event>>,
+) -> BotResult<Job> {
+    let job = Job::new_async(schedule, move |_uuid, _l| {
+        let sender = sender.clone();
+        Box::pin(async move {
+            let now = Utc::now();
+            let day = now.day();
+            if let Err(e) = sender
+                .send(Event::DailySolutionsThreadToInitialize(day))
+                .await
+            {
+                let error =
+                    BotError::ChannelSend(format!("Could not send message to MPSC channel. {e}"));
+                error!("{error}");
             };
         })
     })?;
@@ -148,6 +174,11 @@ async fn watch_global_leaderboard_job(
             let mut interval = time::interval(Duration::from_secs(3));
 
             //TODO: Set year and day programmatically from Utc::now()
+
+            // let now = Utc::now();
+            // let year = now.year();
+            // let day = now.day() as u8;
+
             let (year, day) = (2022, 9);
 
             let mut known_heroes: Vec<Identifier> = vec![];
@@ -165,7 +196,14 @@ async fn watch_global_leaderboard_job(
                         global_leaderboard_is_complete = scraped_leaderboard.is_complete();
 
                         if global_leaderboard_is_complete {
-                            if let Err(e) = sender.send(Event::GlobalLeaderboardComplete).await {
+                            // TODO: retrieve fast and slow for Announcement
+                            //
+                            if let Err(e) = sender
+                                .send(Event::GlobalLeaderboardComplete(
+                                    scraped_leaderboard.clone(),
+                                ))
+                                .await
+                            {
                                 let error = BotError::ChannelSend(format!(
                                     "Could not send message to MPSC channel. {e}"
                                 ));

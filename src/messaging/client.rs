@@ -59,28 +59,46 @@ impl AoCSlackClient {
 
                 let response_text = event.to_string();
 
-                let response = match event {
+                let response = match &event {
                     Event::CommandReceived(channel_id, thread_ts, _cmd) => {
                         // let data = cache.data.lock().unwrap();
                         // // TODO: inject timestamp too
                         // let ranking = data.leaderboard.standings_by_local_score();
 
                         SlackApiChatPostMessageRequest::new(
-                            channel_id,
+                            channel_id.clone(),
                             SlackMessageContent::new().with_text(response_text),
                         )
-                        .with_thread_ts(thread_ts)
+                        .with_thread_ts(thread_ts.clone())
                     }
                     _ => SlackApiChatPostMessageRequest::new(
-                        channel_id,
+                        channel_id.clone(),
                         SlackMessageContent::new().with_text(response_text),
                     ),
                 };
 
-                if let Err(e) = session.chat_post_message(&response).await {
-                    let error = BotError::Slack(e.to_string());
-                    error!("{error}");
-                };
+                match session.chat_post_message(&response).await {
+                    Err(e) => {
+                        let error = BotError::Slack(e.to_string());
+                        error!("{error}");
+                    }
+                    Ok(res) => {
+                        // If Solution thread initialization, post a first message in thread
+                        if let Event::DailySolutionsThreadToInitialize(_day) = event {
+                            let thread_ts = res.ts;
+                            let message = format!("Show me your best move!");
+                            let first_thread_message = SlackApiChatPostMessageRequest::new(
+                                channel_id,
+                                SlackMessageContent::new().with_text(message),
+                            )
+                            .with_thread_ts(thread_ts);
+                            if let Err(e) = session.chat_post_message(&first_thread_message).await {
+                                let error = BotError::Slack(e.to_string());
+                                error!("{error}");
+                            };
+                        }
+                    }
+                }
             }
         });
     }
@@ -125,46 +143,37 @@ async fn push_events_socket_mode_function(
     states: SlackClientEventsUserState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if let SlackEventCallbackBody::Message(message) = event.event {
-        match message.sender.bot_id {
-            Some(_) => {
-                // Message from bot, ignore
-            }
-            None => {
-                // message from user, we will handle it if there is content and channel_id
-                if let (Some(content), Some(channel_id)) = (message.content, message.origin.channel)
-                {
-                    if let Some(t) = content.text {
-                        if Command::is_command(&t) {
-                            let states = states.read().await;
-                            let state: Option<&MyEnvironment> =
-                                states.get_user_state::<MyEnvironment>();
-                            if let Some(env) = state {
-                                let cache = env.cache.clone();
-                                let sender = env.sender.clone();
+        // Only respond to messages from users (no bot_id)
+        if let None = message.sender.bot_id {
+            // message from user, we will handle it if there is content and channel_id
+            if let (Some(content), Some(channel_id)) = (message.content, message.origin.channel) {
+                if let Some(t) = content.text {
+                    if Command::is_command(&t) {
+                        let states = states.read().await;
+                        let state: Option<&MyEnvironment> =
+                            states.get_user_state::<MyEnvironment>();
+                        if let Some(env) = state {
+                            let cache = env.cache.clone();
+                            let sender = env.sender.clone();
 
-                                let cmd = {
-                                    let data = cache.data.lock().unwrap();
-                                    // Command::build_from(t, &data.leaderboard)
-                                    Command::build_from(t, &data)
-                                };
-
-                                // TODO: Here we need to match commands by parsing t and if recognized command we sent
-                                // an event so it can be processed.
-                                // if let Some(cmd) = Command::try_parse_from_str(&t, cache.leaderboard) {
-                                let thread_ts = message.origin.ts; // to respond in thread
-
-                                if let Err(e) = sender
-                                    .send(Event::CommandReceived(channel_id, thread_ts, cmd))
-                                    .await
-                                {
-                                    error!("{}", e);
-                                };
-                                // }
+                            let cmd = {
+                                let data = cache.data.lock().unwrap();
+                                Command::build_from(t, &data)
                             };
+
+                            let thread_ts = message.origin.ts; // to respond in thread
+
+                            if let Err(e) = sender
+                                .send(Event::CommandReceived(channel_id, thread_ts, cmd))
+                                .await
+                            {
+                                error!("{}", e);
+                            };
+                            // }
                         };
                     };
                 };
-            }
+            };
         }
     };
     Ok(())
