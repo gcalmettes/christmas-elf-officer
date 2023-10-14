@@ -6,7 +6,7 @@ use std::fmt;
 use std::collections::HashMap;
 
 use crate::aoc::leaderboard::{
-    GlobalLeaderboard, GlobalLeaderboardEntry, Identifier, PrivateLeaderboard,
+    GlobalLeaderboard, GlobalLeaderboardEntry, Identifier, PrivateLeaderboard, ProblemPart,
     ScrapedPrivateLeaderboard, Solution,
 };
 use crate::error::{BotError, BotResult};
@@ -120,14 +120,61 @@ impl AoC {
         year: i32,
         day: u8,
     ) -> BotResult<GlobalLeaderboard> {
+        // The HTML document is organized like so:
+        //
+        //      <p>First hundred users to get <span class="leaderboard-daydesc-both">both stars</span> on Day XX:</p>
+        //      <div>some entry</div>
+        //      <div>some entry</div>
+        //      <p>First hundred users to get the <span class="leaderboard-daydesc-first">first star</span> on Day XX:</p>
+        //      <div>some entry</div>
+        //      <div>some entry</div>
+        //
+        // Instead of just selecting all the div and having some logic based on parsing to get the
+        // entries associated with the first or second part, we will directly extract the part
+        // information based on the siblings of the <p> elements.
+
         let document = Html::parse_document(&leaderboard);
+        let selector_first_part = Selector::parse(r#"span.leaderboard-daydesc-first"#).unwrap();
+        let selector_second_part = Selector::parse(r#"span.leaderboard-daydesc-both"#).unwrap();
 
-        let selector = Selector::parse(r#"div.leaderboard-entry"#).unwrap();
+        // Entries first part. The selector will only give us the div below the p>span.leaderboard-daydesc-first element
+        let mut entries = match document.select(&selector_first_part).last() {
+            Some(span) => span.parent().map_or(vec![], |p| {
+                p.next_siblings()
+                    .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
+                    .filter_map(|entry| {
+                        GlobalLeaderboardEntry::from_html(entry, year, day, ProblemPart::FIRST)
+                    })
+                    .collect::<Vec<GlobalLeaderboardEntry>>()
+            }),
+            _ => vec![],
+        };
 
-        let entries = document
-            .select(&selector)
-            .filter_map(|entry| GlobalLeaderboardEntry::from_html(entry, year, day))
-            .collect::<Vec<GlobalLeaderboardEntry>>();
+        // Because the p>span.leaderboard-daydesc-both element is at the top, the selector will give us the entry divs for both parts.
+        // We will need to filter out entries already matched in first part.
+        let mut entries_second = match document.select(&selector_second_part).last() {
+            Some(span) => span.parent().map_or(vec![], |p| {
+                p.next_siblings()
+                    .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
+                    .filter_map(|entry| {
+                        GlobalLeaderboardEntry::from_html(entry, year, day, ProblemPart::SECOND)
+                    })
+                    // Filter out entries of first part.
+                    .filter(|e| {
+                        !entries.contains(&GlobalLeaderboardEntry {
+                            id: e.id,
+                            rank: e.rank,
+                            time: e.time,
+                            part: ProblemPart::FIRST,
+                        })
+                    })
+                    .collect::<Vec<GlobalLeaderboardEntry>>()
+            }),
+            _ => vec![],
+        };
+
+        // Merge all entries.
+        entries.append(&mut entries_second);
 
         Ok(GlobalLeaderboard(entries))
     }
@@ -174,6 +221,7 @@ impl AoC {
 
             for (day, stars) in member.completion_day_level.iter() {
                 for (star, info) in stars.iter() {
+                    let star = star.parse().map_err(|_| BotError::Parse)?;
                     earned_stars.push(Solution {
                         timestamp: Utc
                             .timestamp_opt(info.get_star_ts, 0)
@@ -181,7 +229,7 @@ impl AoC {
                             .ok_or(BotError::Parse)?,
                         year: parsed.event.parse().map_err(|_| BotError::Parse)?,
                         day: day.parse::<u8>().map_err(|_| BotError::Parse)?,
-                        part: star.parse().map_err(|_| BotError::Parse)?,
+                        part: ProblemPart::from(star),
                         id: Identifier {
                             name: name.clone(),
                             numeric: member.id,

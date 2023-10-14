@@ -8,7 +8,7 @@ use tracing::{error, info};
 use std::sync::Arc;
 
 use crate::aoc::client::AoC;
-use crate::aoc::leaderboard::Identifier;
+use crate::aoc::leaderboard::{Identifier, ProblemPart};
 use crate::error::{BotError, BotResult};
 use crate::messaging::models::Event;
 use crate::storage::MemoryCache;
@@ -181,23 +181,19 @@ async fn watch_global_leaderboard_job(
 
             let (year, day) = (2022, 9);
 
-            let mut known_heroes: Vec<Identifier> = vec![];
+            let mut known_hero_hits: Vec<(Identifier, ProblemPart)> = vec![];
 
             let mut global_leaderboard_is_complete = false;
             while !global_leaderboard_is_complete {
-                info!("GLobal leaderboard not complete");
+                info!("Global Leaderboard for day {day} not complete yet.");
                 match aoc_client.global_leaderboard(year, day).await {
                     Ok(scraped_leaderboard) => {
-                        info!(
-                            "Global Leaderboard for day {} is complete {}",
-                            day,
-                            scraped_leaderboard.is_complete()
-                        );
                         global_leaderboard_is_complete = scraped_leaderboard.is_complete();
 
                         if global_leaderboard_is_complete {
-                            // TODO: retrieve fast and slow for Announcement
-                            //
+                            info!("Global Leaderboard for day {day} is complete!");
+
+                            // TODO: send only needed data for announcement (fast and slow)
                             if let Err(e) = sender
                                 .send(Event::GlobalLeaderboardComplete(
                                     scraped_leaderboard.clone(),
@@ -212,7 +208,7 @@ async fn watch_global_leaderboard_job(
                         }
 
                         // Scoped to not held data across .await
-                        let heroes = {
+                        let hero_hits = {
                             // check if private members made it to the global leaderboard
                             let private_leaderboard = cache.data.lock().unwrap();
                             scraped_leaderboard
@@ -220,11 +216,15 @@ async fn watch_global_leaderboard_job(
                         };
 
                         // TODO: replace with function that sends message to matterbridge
-                        for hero in heroes {
+                        for hero_hit in hero_hits {
                             // If not already known, send shoutout to hero
-                            if !known_heroes.contains(&hero) {
+                            if !known_hero_hits.contains(&hero_hit) {
+                                let (hero, part) = &hero_hit;
                                 if let Err(e) = sender
-                                    .send(Event::GlobalLeaderboardHeroFound(hero.name.clone()))
+                                    .send(Event::GlobalLeaderboardHeroFound((
+                                        hero.name.clone(),
+                                        part.to_string(),
+                                    )))
                                     .await
                                 {
                                     let error = BotError::ChannelSend(format!(
@@ -233,7 +233,7 @@ async fn watch_global_leaderboard_job(
                                     error!("{error}");
                                 } else {
                                     // Announcement successful, let's register the hero.
-                                    known_heroes.push(hero);
+                                    known_hero_hits.push(hero_hit);
                                 };
                             }
                         }
