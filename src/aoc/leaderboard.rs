@@ -1,7 +1,8 @@
+use crate::utils::suffix;
 use chrono::naive::NaiveDateTime;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration, Local, Utc};
 use itertools::Itertools;
-use scraper::Selector;
+use scraper::{Node, Selector};
 use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fmt;
@@ -12,6 +13,47 @@ use std::ops::{Deref, DerefMut};
 pub enum ProblemPart {
     FIRST,
     SECOND,
+}
+
+#[derive(Debug)]
+pub struct LeaderboardStatistics {
+    pub p1_time_fast: String,
+    pub p1_time_slow: String,
+    pub p2_time_fast: String,
+    pub p2_time_slow: String,
+    pub delta_fast: String,
+    pub delta_slow: String,
+}
+
+// Puzzle completion events parsed from AoC API.
+// Year and day fields match corresponding components of DateTime<Utc>.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct Solution {
+    pub timestamp: DateTime<Utc>,
+    pub year: i32,
+    pub day: u8,
+    pub part: ProblemPart,
+    pub id: Identifier,
+    pub rank: Option<u8>,
+}
+
+// unique identifier for a participant on this leaderboard
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub struct Identifier {
+    pub name: String,
+    pub numeric: u64,
+    pub global_score: u64,
+}
+
+type SolutionVec = Vec<Solution>;
+
+#[derive(Debug)]
+pub struct Leaderboard(SolutionVec);
+
+#[derive(Debug)]
+pub struct ScrapedLeaderboard {
+    pub timestamp: chrono::DateTime<Utc>,
+    pub leaderboard: Leaderboard,
 }
 
 impl fmt::Display for ProblemPart {
@@ -38,51 +80,93 @@ impl ProblemPart {
     }
 }
 
-// Puzzle completion events parsed from AoC API.
-// Year and day fields match corresponding components of DateTime<Utc>.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Solution {
-    pub timestamp: DateTime<Utc>,
-    pub year: i32,
-    pub day: u8,
-    pub part: ProblemPart,
-    pub id: Identifier,
+impl Solution {
+    pub fn from_html(
+        entry: scraper::element_ref::ElementRef,
+        year: i32,
+        day: u8,
+        part: ProblemPart,
+    ) -> Option<Self> {
+        let rank_selector = Selector::parse(r#".leaderboard-position"#).unwrap();
+        let time_selector = Selector::parse(r#".leaderboard-time"#).unwrap();
+
+        let id = match entry.value().attr("data-user-id") {
+            Some(id) => id.parse::<u64>().ok(),
+            None => None,
+        };
+
+        let name = entry
+            .children()
+            .filter_map(|node| match node.value() {
+                Node::Text(text) => Some(text.trim()),
+                Node::Element(el) => match el.name() {
+                    "a" => {
+                        let text = node.last_child().unwrap().value();
+                        let text = text.as_text().unwrap().trim();
+                        // We want to skip <a> ref for (Sponsor) or (AoC++) and only keep the name.
+                        match (text.starts_with("("), text.ends_with(")")) {
+                            (false, false) => Some(text),
+                            (_, _) => None,
+                        }
+                    }
+                    _ => None,
+                },
+                _ => None,
+            })
+            .filter(|text| !text.is_empty())
+            .last();
+
+        let rank = match entry.select(&rank_selector).next() {
+            Some(text) => match text.text().next() {
+                Some(t) => {
+                    if let Some(rank) = t.split(")").next() {
+                        rank.trim().parse::<u8>().ok()
+                    } else {
+                        None
+                    }
+                }
+                None => None,
+            },
+            None => None,
+        };
+
+        let timestamp = match entry.select(&time_selector).next() {
+            Some(t) => t
+                .text()
+                .filter_map(|time| {
+                    let with_year = format!("{} {}", year, time);
+                    let naive_datetime =
+                        NaiveDateTime::parse_from_str(&with_year, "%Y %b %d  %H:%M:%S").ok();
+                    naive_datetime
+                })
+                .map(|d| DateTime::<Utc>::from_utc(d, Utc) + Duration::hours(6))
+                .last(),
+            None => None,
+        };
+
+        match (id, name, rank, timestamp) {
+            (Some(id), _, Some(rank), Some(timestamp)) => Some(Solution {
+                id: Identifier {
+                    name: name
+                        .map_or(format!("anonymous user #{}", id), |n| n.to_string())
+                        .to_string(),
+                    numeric: id,
+                    global_score: 0,
+                },
+                rank: Some(rank),
+                part,
+                year,
+                day,
+                timestamp,
+            }),
+            _ => None,
+        }
+    }
 }
 
-// unique identifier for a participant on this leaderboard
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
-pub struct Identifier {
-    pub name: String,
-    pub numeric: u64,
-    pub global_score: u64,
-}
-
-type SolutionVec = Vec<Solution>;
-type GlobalLeaderboardEntryVec = Vec<GlobalLeaderboardEntry>;
-
-#[derive(Debug)]
-pub struct PrivateLeaderboard(SolutionVec);
-
-#[derive(Debug)]
-pub struct ScrapedPrivateLeaderboard {
-    pub timestamp: chrono::DateTime<Utc>,
-    pub leaderboard: PrivateLeaderboard,
-}
-
-#[derive(Debug, Clone)]
-pub struct GlobalLeaderboard(pub GlobalLeaderboardEntryVec);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct GlobalLeaderboardEntry {
-    pub id: u64,
-    pub rank: u8,
-    pub part: ProblemPart,
-    pub time: Duration,
-}
-
-impl PrivateLeaderboard {
-    pub fn new() -> PrivateLeaderboard {
-        PrivateLeaderboard(SolutionVec::new())
+impl Leaderboard {
+    pub fn new() -> Leaderboard {
+        Leaderboard(SolutionVec::new())
     }
 
     /// Members => (unordered) stars
@@ -152,7 +236,7 @@ impl PrivateLeaderboard {
             .collect()
     }
 
-    pub fn compute_diffs(&self, current_leaderboard: &PrivateLeaderboard) -> Vec<&Solution> {
+    pub fn compute_diffs(&self, current_leaderboard: &Leaderboard) -> Vec<&Solution> {
         let current_solutions = current_leaderboard
             .iter()
             .map(|s| (s.id.numeric, s.day, s.part));
@@ -237,7 +321,7 @@ impl PrivateLeaderboard {
     }
 }
 
-impl Deref for PrivateLeaderboard {
+impl Deref for Leaderboard {
     type Target = SolutionVec;
 
     fn deref(&self) -> &Self::Target {
@@ -245,63 +329,159 @@ impl Deref for PrivateLeaderboard {
     }
 }
 
-impl DerefMut for PrivateLeaderboard {
+impl DerefMut for Leaderboard {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl GlobalLeaderboard {
-    pub fn is_complete(&self) -> bool {
-        self.0.len() == 200
+impl ScrapedLeaderboard {
+    pub fn new() -> ScrapedLeaderboard {
+        ScrapedLeaderboard {
+            timestamp: Utc::now(),
+            leaderboard: Leaderboard::new(),
+        }
     }
 
-    fn sorted_ranks(
-        &self,
-    ) -> impl Iterator<
-        Item = (
-            u8,
-            Option<&GlobalLeaderboardEntry>,
-            Option<&GlobalLeaderboardEntry>,
-        ),
-    > {
-        let by_rank = self.0.iter().into_group_map_by(|e| e.rank);
-        by_rank
-            .into_iter()
-            .map(|(rank, times)| {
-                let mut chronologically_ordered = times.into_iter().sorted_by_key(|e| e.time);
+    pub fn is_count_equal_to(&self, n: usize) -> bool {
+        self.leaderboard.len() == n
+    }
+
+    pub fn statistics(&self, year: i32, day: u8) -> LeaderboardStatistics {
+        // Separate entries into part1/part2
+        let data = self
+            .leaderboard
+            .iter()
+            .filter(|e| e.year == year && e.day == day)
+            .into_group_map_by(|entry| entry.part);
+
+        // Make sure it's chronologically ordered.
+        let mut part_1 = data.get(&ProblemPart::FIRST).unwrap().clone();
+        let mut part_2 = data.get(&ProblemPart::SECOND).unwrap().clone();
+        part_1.sort_by_key(|e| e.timestamp);
+        part_2.sort_by_key(|e| e.timestamp);
+
+        // Prepare iterators to retrieve values.
+        let mut part_1 = part_1.iter();
+        let mut part_2 = part_2.iter();
+
+        let challenge_start_time = DateTime::<Utc>::from_utc(
+            NaiveDateTime::parse_from_str(
+                format!("{year}-12-{day} 06:00:00").as_str(),
+                "%Y-%m-%d %H:%M:%S",
+            )
+            .unwrap(),
+            Utc,
+        );
+
+        let (fastest_part_one, fastest_part_two, slowest_part_one, slowest_part_two) = {
+            if let (
+                Some(first_part_fast),
+                Some(first_part_slow),
+                Some(second_part_fast),
+                Some(second_part_slow),
+            ) = (part_1.next(), part_1.last(), part_2.next(), part_2.last())
+            {
+                let first_part_fast_time = {
+                    // format!("{}", first_part_fast.timestamp.format("%d/%m/%Y %H:%M:%S"))
+                    let fast = first_part_fast.timestamp - challenge_start_time;
+                    let seconds = fast.num_seconds() % 60;
+                    let minutes = (fast.num_seconds() / 60) % 60;
+                    let hours = (fast.num_seconds() / 60) / 60;
+                    format!(
+                        "[{}] {:02}:{:02}:{:02}",
+                        first_part_fast.rank.unwrap(),
+                        hours,
+                        minutes,
+                        seconds,
+                    )
+                };
+                let second_part_fast_time = {
+                    // format!("{}", second_part_fast.timestamp.format("%d/%m/%Y %H:%M:%S"))
+                    let fast = second_part_fast.timestamp - challenge_start_time;
+                    let seconds = fast.num_seconds() % 60;
+                    let minutes = (fast.num_seconds() / 60) % 60;
+                    let hours = (fast.num_seconds() / 60) / 60;
+                    format!(
+                        "[{}] {:02}:{:02}:{:02}",
+                        second_part_fast.rank.unwrap(),
+                        hours,
+                        minutes,
+                        seconds,
+                    )
+                };
+                let first_part_slow_time = {
+                    // format!("{}", first_part_slow.timestamp.format("%d/%m/%Y %H:%M:%S"))
+                    let slow = first_part_slow.timestamp - challenge_start_time;
+                    let seconds = slow.num_seconds() % 60;
+                    let minutes = (slow.num_seconds() / 60) % 60;
+                    let hours = (slow.num_seconds() / 60) / 60;
+                    format!(
+                        "[{}] {:02}:{:02}:{:02}",
+                        first_part_slow.rank.unwrap(),
+                        hours,
+                        minutes,
+                        seconds,
+                    )
+                };
+                let second_part_slow_time = {
+                    // format!("{}", second_part_slow.timestamp.format("%d/%m/%Y %H:%M:%S"))
+                    let slow = second_part_slow.timestamp - challenge_start_time;
+                    let seconds = slow.num_seconds() % 60;
+                    let minutes = (slow.num_seconds() / 60) % 60;
+                    let hours = (slow.num_seconds() / 60) / 60;
+                    format!(
+                        "[{}] {:02}:{:02}:{:02}",
+                        second_part_slow.rank.unwrap(),
+                        hours,
+                        minutes,
+                        seconds,
+                    )
+                };
                 (
-                    rank,
-                    chronologically_ordered.next(),
-                    chronologically_ordered.next(),
+                    first_part_fast_time,
+                    second_part_fast_time,
+                    first_part_slow_time,
+                    second_part_slow_time,
                 )
-            })
-            .sorted_by_key(|t| t.0)
-    }
+            } else {
+                (
+                    "[1] N/A".to_string(),
+                    "[1] N/A".to_string(),
+                    "[100] N/A".to_string(),
+                    "[100] N/A".to_string(),
+                )
+            }
+        };
 
-    fn sorted_deltas(&self) -> std::vec::IntoIter<(Duration, u8)> {
         // Needed for computation of deltas for members who only scored one part of the global
         // leaderboard that day.
-        let (max_time_for_first_part, max_time_for_second_part) = self.0.iter().fold(
-            (Duration::milliseconds(0), Duration::milliseconds(0)),
+        let (max_time_for_first_part, max_time_for_second_part) = self.leaderboard.iter().fold(
+            (DateTime::<Utc>::MIN_UTC, DateTime::<Utc>::MIN_UTC),
             |mut acc, entry| match entry.part {
                 ProblemPart::FIRST => {
-                    if entry.time > acc.0 {
-                        acc.0 = entry.time
+                    if entry.timestamp > acc.0 {
+                        acc.0 = entry.timestamp
                     };
                     acc
                 }
                 ProblemPart::SECOND => {
-                    if entry.time > acc.1 {
-                        acc.1 = entry.time
+                    if entry.timestamp > acc.1 {
+                        acc.1 = entry.timestamp
                     };
                     acc
                 }
             },
         );
 
-        let by_id = self.0.iter().into_group_map_by(|e| e.id);
-        by_id
+        // Compute deltas
+        let by_id = self
+            .leaderboard
+            .iter()
+            .filter(|e| e.rank.is_some())
+            .into_group_map_by(|e| e.id.numeric);
+
+        let mut sorted_deltas = by_id
             .into_iter()
             .map(|(_id, entries)| {
                 match entries.len() {
@@ -314,7 +494,8 @@ impl GlobalLeaderboard {
                                 // Duration is > (max second part - part.1), so we'll add 1 to the
                                 // diff as we have no way to know exactly
                                 (
-                                    max_time_for_second_part - entry.time + Duration::seconds(1),
+                                    max_time_for_second_part - entry.timestamp
+                                        + Duration::seconds(1),
                                     101,
                                 )
                             }
@@ -322,64 +503,83 @@ impl GlobalLeaderboard {
                                 // Overtimed on first part, but came back strong to score second part
                                 // Duration is > (part.1, - max first part). We'll substract 1 sec.
                                 (
-                                    entry.time - max_time_for_first_part - Duration::seconds(1),
-                                    entry.rank,
+                                    entry.timestamp
+                                        - max_time_for_first_part
+                                        - Duration::seconds(1),
+                                    entry.rank.unwrap(),
                                 )
                             }
                         }
                     }
                     2 => {
-                        let mut sorted = entries.into_iter().sorted_by_key(|e| e.time);
+                        let mut sorted = entries.into_iter().sorted_by_key(|e| e.timestamp);
                         // unwrap are safe as len == 2
                         let (p1, p2) = (sorted.next().unwrap(), sorted.next().unwrap());
-                        (p2.time - p1.time, p2.rank)
+                        (p2.timestamp - p1.timestamp, p2.rank.unwrap())
                     }
                     _ => unreachable!(),
                 }
             })
-            .sorted()
-    }
+            .filter(|(_duration, rank)| rank <= &100)
+            .sorted();
 
-    pub fn get_fastest_and_slowest_times(
-        &self,
-    ) -> (
-        Option<(
-            u8,
-            Option<&GlobalLeaderboardEntry>,
-            Option<&GlobalLeaderboardEntry>,
-        )>,
-        Option<(
-            u8,
-            Option<&GlobalLeaderboardEntry>,
-            Option<&GlobalLeaderboardEntry>,
-        )>,
-    ) {
-        let mut ranked = self.sorted_ranks();
-        (ranked.next(), ranked.last())
-    }
+        let (fastest_delta, slowest_delta) =
+            if let (Some((delta_fast, rank_fast)), Some((delta_slow, rank_slow))) =
+                (sorted_deltas.next(), sorted_deltas.last())
+            {
+                let seconds_fast = delta_fast.num_seconds() % 60;
+                let minutes_fast = (delta_fast.num_seconds() / 60) % 60;
+                let hours_fast = (delta_fast.num_seconds() / 60) / 60;
+                let fmt_fast = format!(
+                    "{:02}:{:02}:{:02} ({}{})",
+                    hours_fast,
+                    minutes_fast,
+                    seconds_fast,
+                    rank_fast,
+                    suffix(rank_fast)
+                );
 
-    pub fn get_fastest_and_slowest_deltas(
-        &self,
-    ) -> (Option<(Duration, u8)>, Option<(Duration, u8)>) {
-        // only keep people who finished in top 100 of part 2
-        let mut deltas = self
-            .sorted_deltas()
-            .filter(|(_duration, rank)| rank <= &100);
-        (deltas.next(), deltas.last())
+                let seconds_slow = delta_slow.num_seconds() % 60;
+                let minutes_slow = (delta_slow.num_seconds() / 60) % 60;
+                let hours_slow = (delta_slow.num_seconds() / 60) / 60;
+                let fmt_slow = format!(
+                    "{:02}:{:02}:{:02} ({}{})",
+                    hours_slow,
+                    minutes_slow,
+                    seconds_slow,
+                    rank_slow,
+                    suffix(rank_slow)
+                );
+
+                (fmt_fast, fmt_slow)
+            } else {
+                ("".to_string(), "".to_string())
+            };
+
+        let statistics = LeaderboardStatistics {
+            p1_time_fast: fastest_part_one,
+            p1_time_slow: slowest_part_one,
+            p2_time_fast: fastest_part_two,
+            p2_time_slow: slowest_part_two,
+            delta_fast: fastest_delta,
+            delta_slow: slowest_delta,
+        };
+        statistics
     }
 
     pub fn check_for_private_members(
         &self,
-        private_leaderboard: &PrivateLeaderboard,
+        private_leaderboard: &Leaderboard,
     ) -> Vec<(Identifier, ProblemPart)> {
         let private_members_ids = private_leaderboard.members_ids();
         let heroes = self
+            .leaderboard
             .iter()
-            .filter(|entry| private_members_ids.contains(&entry.id))
+            .filter(|entry| private_members_ids.contains(&entry.id.numeric))
             .map(|entry| {
                 (
                     private_leaderboard
-                        .get_member_by_id(entry.id)
+                        .get_member_by_id(entry.id.numeric)
                         // we can safely unwrap as if it enters the map there is a match
                         .unwrap()
                         .clone(),
@@ -388,92 +588,5 @@ impl GlobalLeaderboard {
             })
             .collect::<Vec<(Identifier, ProblemPart)>>();
         heroes
-    }
-}
-
-impl Deref for GlobalLeaderboard {
-    type Target = GlobalLeaderboardEntryVec;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for GlobalLeaderboard {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl ScrapedPrivateLeaderboard {
-    pub fn new() -> ScrapedPrivateLeaderboard {
-        ScrapedPrivateLeaderboard {
-            timestamp: Utc::now(),
-            leaderboard: PrivateLeaderboard::new(),
-        }
-    }
-}
-
-impl GlobalLeaderboardEntry {
-    pub fn from_html(
-        entry: scraper::element_ref::ElementRef,
-        year: i32,
-        day: u8,
-        part: ProblemPart,
-    ) -> Option<Self> {
-        let rank_selector = Selector::parse(r#".leaderboard-position"#).unwrap();
-        let time_selector = Selector::parse(r#".leaderboard-time"#).unwrap();
-
-        let id = match entry.value().attr("data-user-id") {
-            Some(id) => id.parse::<u64>().ok(),
-            None => None,
-        };
-
-        let rank = match entry.select(&rank_selector).next() {
-            Some(text) => match text.text().next() {
-                Some(t) => {
-                    if let Some(rank) = t.split(")").next() {
-                        rank.trim().parse::<u8>().ok()
-                    } else {
-                        None
-                    }
-                }
-                None => None,
-            },
-            None => None,
-        };
-
-        let time = match entry.select(&time_selector).next() {
-            Some(t) => {
-                t.text()
-                    .filter_map(|time| {
-                        let with_year = format!("{} {}", year, time);
-                        // This will provably never happen, but in theory, even competitors of the global leaderboard could take more than 24h to solve a challenge.
-                        // So we will compute the duration based on day.
-                        let start_time = format!("{} Dec  {}  00:00:00", year, day);
-                        let naive_datetime =
-                            NaiveDateTime::parse_from_str(&with_year, "%Y %b %d  %H:%M:%S").ok();
-                        let naive_start =
-                            NaiveDateTime::parse_from_str(&start_time, "%Y %b %d  %H:%M:%S").ok();
-
-                        match (naive_datetime, naive_start) {
-                            (Some(finish), Some(start)) => Some(finish - start),
-                            (_, _) => None,
-                        }
-                    })
-                    .last()
-            }
-            None => None,
-        };
-
-        match (id, rank, time) {
-            (Some(id), Some(rank), Some(time)) => Some(GlobalLeaderboardEntry {
-                id,
-                rank,
-                time,
-                part,
-            }),
-            (_, _, _) => None,
-        }
     }
 }

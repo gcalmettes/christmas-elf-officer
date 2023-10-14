@@ -183,35 +183,21 @@ async fn watch_global_leaderboard_job(
 
             let mut known_hero_hits: Vec<(Identifier, ProblemPart)> = vec![];
 
+            info!("Starting polling Global Leaderboard for day {day}.");
             let mut global_leaderboard_is_complete = false;
+
             while !global_leaderboard_is_complete {
                 info!("Global Leaderboard for day {day} not complete yet.");
                 match aoc_client.global_leaderboard(year, day).await {
-                    Ok(scraped_leaderboard) => {
-                        global_leaderboard_is_complete = scraped_leaderboard.is_complete();
-
-                        if global_leaderboard_is_complete {
-                            info!("Global Leaderboard for day {day} is complete!");
-
-                            // TODO: send only needed data for announcement (fast and slow)
-                            if let Err(e) = sender
-                                .send(Event::GlobalLeaderboardComplete(
-                                    scraped_leaderboard.clone(),
-                                ))
-                                .await
-                            {
-                                let error = BotError::ChannelSend(format!(
-                                    "Could not send message to MPSC channel. {e}"
-                                ));
-                                error!("{error}");
-                            };
-                        }
+                    Ok(global_leaderboard) => {
+                        // 100 entries for each part, so completion is 2*100
+                        global_leaderboard_is_complete = global_leaderboard.is_count_equal_to(200);
 
                         // Scoped to not held data across .await
                         let hero_hits = {
                             // check if private members made it to the global leaderboard
                             let private_leaderboard = cache.data.lock().unwrap();
-                            scraped_leaderboard
+                            global_leaderboard
                                 .check_for_private_members(&private_leaderboard.leaderboard)
                         };
 
@@ -236,6 +222,23 @@ async fn watch_global_leaderboard_job(
                                     known_hero_hits.push(hero_hit);
                                 };
                             }
+                        }
+
+                        if global_leaderboard_is_complete {
+                            info!("Global Leaderboard for day {day} is complete!");
+
+                            // TODO: send only needed data for announcement (fast and slow)
+                            if let Err(e) = sender
+                                .send(Event::GlobalLeaderboardComplete(
+                                    global_leaderboard.statistics(year, day),
+                                ))
+                                .await
+                            {
+                                let error = BotError::ChannelSend(format!(
+                                    "Could not send message to MPSC channel. {e}"
+                                ));
+                                error!("{error}");
+                            };
                         }
                     }
                     Err(e) => {

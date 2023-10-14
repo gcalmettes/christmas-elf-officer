@@ -1,4 +1,4 @@
-use crate::aoc::leaderboard::{GlobalLeaderboard, ScrapedPrivateLeaderboard};
+use crate::aoc::leaderboard::{LeaderboardStatistics, ScrapedLeaderboard};
 use minijinja::{context, Environment};
 use once_cell::sync::Lazy;
 use std::fmt;
@@ -32,9 +32,9 @@ static TEMPLATES_ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
 
 const COMMANDS: [&'static str; 2] = ["!help", "!ranking"];
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum Event {
-    GlobalLeaderboardComplete(GlobalLeaderboard),
+    GlobalLeaderboardComplete(LeaderboardStatistics),
     GlobalLeaderboardHeroFound((String, String)),
     PrivateLeaderboardUpdated,
     DailySolutionsThreadToInitialize(u32),
@@ -53,7 +53,7 @@ impl Command {
         COMMANDS.contains(&start_with)
     }
 
-    pub fn build_from(input: String, leaderboard: &ScrapedPrivateLeaderboard) -> Command {
+    pub fn build_from(input: String, leaderboard: &ScrapedLeaderboard) -> Command {
         let start_with = input.trim().split(" ").next().unwrap();
         match start_with {
             cmd if cmd == COMMANDS[0] => Command::Help,
@@ -78,19 +78,6 @@ impl Command {
     // }
 }
 
-fn suffix(num: u8) -> &'static str {
-    let s = num.to_string();
-    if s.ends_with('1') && !s.ends_with("11") {
-        "st"
-    } else if s.ends_with('2') && !s.ends_with("12") {
-        "nd"
-    } else if s.ends_with('3') && !s.ends_with("13") {
-        "rd"
-    } else {
-        "th"
-    }
-}
-
 impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -98,109 +85,19 @@ impl fmt::Display for Event {
                 write!(f, ":point_down: Daily solution thread for day {}", day)
             }
             // TODO: do not send full global leaderboard but just what we need ?
-            Event::GlobalLeaderboardComplete(global_leaderboard) => {
-                let (fastest_part_one, fastest_part_two, slowest_part_one, slowest_part_two) = {
-                    if let (
-                        Some((_p1, Some(first_part_fast), Some(second_part_fast))),
-                        Some((_p100, Some(first_part_slow), Some(second_part_slow))),
-                    ) = global_leaderboard.get_fastest_and_slowest_times()
-                    {
-                        let first_part_fast_time = {
-                            let fast = first_part_fast.time;
-                            let seconds = fast.num_seconds() % 60;
-                            let minutes = (fast.num_seconds() / 60) % 60;
-                            let hours = (fast.num_seconds() / 60) / 60;
-                            format!(
-                                "[{}] {:02}:{:02}:{:02}",
-                                first_part_fast.rank, hours, minutes, seconds,
-                            )
-                        };
-                        let second_part_fast_time = {
-                            let fast = second_part_fast.time;
-                            let seconds = fast.num_seconds() % 60;
-                            let minutes = (fast.num_seconds() / 60) % 60;
-                            let hours = (fast.num_seconds() / 60) / 60;
-                            format!(
-                                "[{}] {:02}:{:02}:{:02}",
-                                second_part_fast.rank, hours, minutes, seconds,
-                            )
-                        };
-                        let first_part_slow_time = {
-                            let slow = first_part_slow.time;
-                            let seconds = slow.num_seconds() % 60;
-                            let minutes = (slow.num_seconds() / 60) % 60;
-                            let hours = (slow.num_seconds() / 60) / 60;
-                            format!(
-                                "[{}] {:02}:{:02}:{:02}",
-                                first_part_slow.rank, hours, minutes, seconds,
-                            )
-                        };
-                        let second_part_slow_time = {
-                            let slow = second_part_slow.time;
-                            let seconds = slow.num_seconds() % 60;
-                            let minutes = (slow.num_seconds() / 60) % 60;
-                            let hours = (slow.num_seconds() / 60) / 60;
-                            format!(
-                                "[{}] {:02}:{:02}:{:02}",
-                                second_part_slow.rank, hours, minutes, seconds,
-                            )
-                        };
-                        (
-                            first_part_fast_time,
-                            second_part_fast_time,
-                            first_part_slow_time,
-                            second_part_slow_time,
-                        )
-                    } else {
-                        (
-                            "[1] N/A".to_string(),
-                            "[1] N/A".to_string(),
-                            "[100] N/A".to_string(),
-                            "[100] N/A".to_string(),
-                        )
-                    }
-                };
-
-                let (fastest_delta, slowest_delta) = {
-                    if let (Some((delta_fast, rank_fast)), Some((delta_slow, rank_slow))) =
-                        global_leaderboard.get_fastest_and_slowest_deltas()
-                    {
-                        let seconds_fast = delta_fast.num_seconds() % 60;
-                        let minutes_fast = (delta_fast.num_seconds() / 60) % 60;
-                        let hours_fast = (delta_fast.num_seconds() / 60) / 60;
-                        let fmt_fast = format!(
-                            "{:02}:{:02}:{:02} ({}{})",
-                            hours_fast,
-                            minutes_fast,
-                            seconds_fast,
-                            rank_fast,
-                            suffix(rank_fast)
-                        );
-
-                        let seconds_slow = delta_slow.num_seconds() % 60;
-                        let minutes_slow = (delta_slow.num_seconds() / 60) % 60;
-                        let hours_slow = (delta_slow.num_seconds() / 60) / 60;
-                        let fmt_slow = format!(
-                            "{:02}:{:02}:{:02} ({}{})",
-                            hours_slow,
-                            minutes_slow,
-                            seconds_slow,
-                            rank_slow,
-                            suffix(rank_slow)
-                        );
-
-                        (fmt_fast, fmt_slow)
-                    } else {
-                        ("".to_string(), "".to_string())
-                    }
-                };
-
+            Event::GlobalLeaderboardComplete(statistics) => {
                 write!(
                     f,
                     ":tada: Global Leaderboard complete\n\
-                    Part 1: {fastest_part_one} - {slowest_part_one}\n\
-                    Part 2: {fastest_part_two} - {slowest_part_two}\n\
-                    Delta times range in top 100: {fastest_delta} - {slowest_delta}"
+                    Part 1: {} - {}\n\
+                    Part 2: {} - {}\n\
+                    Delta times range in top 100: {} - {}",
+                    statistics.p1_time_fast,
+                    statistics.p1_time_slow,
+                    statistics.p2_time_fast,
+                    statistics.p2_time_slow,
+                    statistics.delta_fast,
+                    statistics.delta_slow,
                 )
             }
             Event::GlobalLeaderboardHeroFound((hero, part)) => {
@@ -242,21 +139,6 @@ impl fmt::Display for Event {
                             .render(context! { timestamp => timestamp, scores => data })
                             .unwrap()
                     )
-
-                    // let timestamp = format!(
-                    //     "{:02}:{:02}:{:02} (UTC)",
-                    //     time.hour(),
-                    //     time.minute(),
-                    //     time.second()
-                    // );
-                    // let ranking =
-                    //     format!(":first_place_medal: Current ranking as of {timestamp}:\n");
-                    // let scores = data
-                    //     .iter()
-                    //     .map(|(name, score)| format!(" \x20 • {name} => {score}"))
-                    //     .join("\n");
-
-                    // write!(f, "{ranking}{scores}")
                 }
             },
         }
