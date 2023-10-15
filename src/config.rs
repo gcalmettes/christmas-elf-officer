@@ -62,9 +62,13 @@ impl Settings {
         let local_settings_yaml_file = ".env.local.yaml";
         let settings: Settings = match Path::new(local_settings_yaml_file).exists() {
             true => {
-                println!("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
-                println!(">>>>>>>> DEV LOCAL MODE >>>>>>>>>>");
-                println!(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n");
+                println!(
+                    "\n######################################\n\
+                       ##   Found '.env.local.yaml' file,  ##\n\
+                       ##   loading local configuration.   ##\n\
+                       ######################################\n\
+                    "
+                );
                 Figment::new()
                     .merge(Yaml::file(local_settings_yaml_file))
                     .merge(Env::raw())
