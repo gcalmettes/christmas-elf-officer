@@ -63,7 +63,6 @@ impl fmt::Display for Event {
             Event::DailySolutionsThreadToInitialize(day) => {
                 write!(f, ":point_down: Daily solution thread for day {}", day)
             }
-            // TODO: do not send full global leaderboard but just what we need ?
             Event::GlobalLeaderboardComplete((day, statistics)) => {
                 write!(
                     f,

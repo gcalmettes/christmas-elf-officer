@@ -6,6 +6,7 @@ use std::fmt;
 use std::collections::HashMap;
 
 use crate::aoc::leaderboard::{Identifier, Leaderboard, ProblemPart, ScrapedLeaderboard, Solution};
+use crate::config;
 use crate::error::{BotError, BotResult};
 
 enum Endpoint {
@@ -33,32 +34,18 @@ pub struct AoC {
     private_leaderboard_id: u64,
 }
 
-struct AoCSettings {
-    base_url: String,
-    timeout: std::time::Duration,
-    private_leaderboard_id: u64,
-    session_cookie: String,
-}
-
-// TODO: get settings from env var or fallback on default
-fn get_default_settings() -> AoCSettings {
-    AoCSettings {
-        base_url: "http://localhost:5001".to_string(),
-        timeout: std::time::Duration::new(5, 0),
-        private_leaderboard_id: 261166,
-        session_cookie: "yolo".to_string(),
-    }
-}
-
 impl AoC {
     pub fn new() -> Self {
-        let settings = get_default_settings();
-        let http_client = Client::builder().timeout(settings.timeout).build().unwrap();
+        let settings = &config::SETTINGS;
+        let http_client = Client::builder()
+            .timeout(std::time::Duration::new(settings.aoc_api_timeout_sec, 0))
+            .build()
+            .unwrap();
         Self {
             http_client,
-            base_url: settings.base_url,
-            private_leaderboard_id: settings.private_leaderboard_id,
-            session_cookie: settings.session_cookie,
+            base_url: settings.aoc_base_url.clone(),
+            private_leaderboard_id: settings.aoc_private_leaderboard_id,
+            session_cookie: settings.aoc_session_cookie.clone(),
         }
     }
 
