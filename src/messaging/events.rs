@@ -95,8 +95,6 @@ impl fmt::Display for Event {
                 write!(f, ":repeat: Private Leaderboard updated")
             }
             Event::CommandReceived(_channel_id, ts, cmd) => match cmd {
-                // \n\ at each code line end creates a line break at the proper position and discards further spaces in this line of code
-                // \x20 (hex; 32 in decimal) is an ASCII space and an indicator for the first space to be preserved in this line of the string
                 Command::Help => {
                     write!(f, "{}", MessageTemplate::Help.get().render({}).unwrap())
                 }

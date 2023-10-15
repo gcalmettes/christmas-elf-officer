@@ -56,6 +56,8 @@ impl MessageTemplate {
     }
 
     pub fn template(&self) -> &'static str {
+        // \n\ at each code line end creates a line break at the proper position and discards further spaces in this line of code.
+        // \x20 (hex; 32 in decimal) is an ASCII space and an indicator for the first space to be preserved in this line of the string.
         match self {
             MessageTemplate::Help => {
                 ":sos: below are the bot commands:\n\
