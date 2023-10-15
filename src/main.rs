@@ -1,15 +1,19 @@
-use ceo_bot::messaging::client::AoCSlackClient;
-use ceo_bot::messaging::events::Event;
-use ceo_bot::scheduler::{JobProcess, Scheduler};
-use ceo_bot::storage::MemoryCache;
-
-use tokio::sync::mpsc;
-
-// use tokio::time::{sleep, Duration};
-
 use chrono::{Timelike, Utc};
 use std::sync::Arc;
+use tokio::sync::mpsc;
 use tracing::{info, Level};
+
+use messaging::client::AoCSlackClient;
+use messaging::events::Event;
+use scheduler::{JobProcess, Scheduler};
+use storage::MemoryCache;
+
+pub mod aoc;
+pub mod error;
+pub mod messaging;
+pub mod scheduler;
+pub mod storage;
+pub mod utils;
 
 #[tokio::main]
 // async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -53,15 +57,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Initializing messaging engine.");
     let slack_client = AoCSlackClient::new();
-    // slack_client.listen_for_events(rx).await;
-    // slack_client.start_slack_socket_mode().await?;
     slack_client
         .handle_messages_and_events(cache, tx, rx)
         .await?;
-    // initialize_messaging(rx).await?;
-
-    // loop {
-    //     sleep(Duration::from_millis(5000)).await;
-    // }
     Ok(())
 }
