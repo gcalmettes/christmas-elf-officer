@@ -1,4 +1,4 @@
-use crate::utils::suffix;
+use crate::utils::challenge_release_time;
 use chrono::naive::NaiveDateTime;
 use chrono::{DateTime, Duration, Local, Utc};
 use itertools::Itertools;
@@ -17,12 +17,13 @@ pub enum ProblemPart {
 
 #[derive(Debug)]
 pub struct LeaderboardStatistics {
-    pub p1_time_fast: String,
-    pub p1_time_slow: String,
-    pub p2_time_fast: String,
-    pub p2_time_slow: String,
-    pub delta_fast: String,
-    pub delta_slow: String,
+    pub p1_time_fast: Option<Duration>,
+    pub p1_time_slow: Option<Duration>,
+    pub p2_time_fast: Option<Duration>,
+    pub p2_time_slow: Option<Duration>,
+    // We also retrieve final rank (part 2) in addition of delta time
+    pub delta_fast: Option<(Duration, u8)>,
+    pub delta_slow: Option<(Duration, u8)>,
 }
 
 // Puzzle completion events parsed from AoC API.
@@ -95,15 +96,18 @@ impl Solution {
             None => None,
         };
 
+        // Depending on whether users have declared their github, are sponsors, etc ... the name
+        // will be accessible in different possible DOM hierarchy layouts.
         let name = entry
             .children()
             .filter_map(|node| match node.value() {
                 Node::Text(text) => Some(text.trim()),
                 Node::Element(el) => match el.name() {
+                    // Name wrapped into <a> tags to link to user's github.
                     "a" => {
                         let text = node.last_child().unwrap().value();
                         let text = text.as_text().unwrap().trim();
-                        // We want to skip <a> ref for (Sponsor) or (AoC++) and only keep the name.
+                        // We ignore <a> tags related to (AoC++) or (Sponsor) labels.
                         match (text.starts_with("("), text.ends_with(")")) {
                             (false, false) => Some(text),
                             (_, _) => None,
@@ -118,13 +122,10 @@ impl Solution {
 
         let rank = match entry.select(&rank_selector).next() {
             Some(text) => match text.text().next() {
-                Some(t) => {
-                    if let Some(rank) = t.split(")").next() {
-                        rank.trim().parse::<u8>().ok()
-                    } else {
-                        None
-                    }
-                }
+                Some(t) => t
+                    .split(")")
+                    .next()
+                    .map_or(None, |rank| rank.trim().parse::<u8>().ok()),
                 None => None,
             },
             None => None,
@@ -147,10 +148,12 @@ impl Solution {
         match (id, name, rank, timestamp) {
             (Some(id), _, Some(rank), Some(timestamp)) => Some(Solution {
                 id: Identifier {
+                    // Name of anonymous user will be None
                     name: name
                         .map_or(format!("anonymous user #{}", id), |n| n.to_string())
                         .to_string(),
                     numeric: id,
+                    // We won't use it
                     global_score: 0,
                 },
                 rank: Some(rank),
@@ -365,94 +368,7 @@ impl ScrapedLeaderboard {
         let mut part_1 = part_1.iter();
         let mut part_2 = part_2.iter();
 
-        let challenge_start_time = DateTime::<Utc>::from_utc(
-            NaiveDateTime::parse_from_str(
-                format!("{year}-12-{day} 06:00:00").as_str(),
-                "%Y-%m-%d %H:%M:%S",
-            )
-            .unwrap(),
-            Utc,
-        );
-
-        let (fastest_part_one, fastest_part_two, slowest_part_one, slowest_part_two) = {
-            if let (
-                Some(first_part_fast),
-                Some(first_part_slow),
-                Some(second_part_fast),
-                Some(second_part_slow),
-            ) = (part_1.next(), part_1.last(), part_2.next(), part_2.last())
-            {
-                let first_part_fast_time = {
-                    // format!("{}", first_part_fast.timestamp.format("%d/%m/%Y %H:%M:%S"))
-                    let fast = first_part_fast.timestamp - challenge_start_time;
-                    let seconds = fast.num_seconds() % 60;
-                    let minutes = (fast.num_seconds() / 60) % 60;
-                    let hours = (fast.num_seconds() / 60) / 60;
-                    format!(
-                        "[{}] {:02}:{:02}:{:02}",
-                        first_part_fast.rank.unwrap(),
-                        hours,
-                        minutes,
-                        seconds,
-                    )
-                };
-                let second_part_fast_time = {
-                    // format!("{}", second_part_fast.timestamp.format("%d/%m/%Y %H:%M:%S"))
-                    let fast = second_part_fast.timestamp - challenge_start_time;
-                    let seconds = fast.num_seconds() % 60;
-                    let minutes = (fast.num_seconds() / 60) % 60;
-                    let hours = (fast.num_seconds() / 60) / 60;
-                    format!(
-                        "[{}] {:02}:{:02}:{:02}",
-                        second_part_fast.rank.unwrap(),
-                        hours,
-                        minutes,
-                        seconds,
-                    )
-                };
-                let first_part_slow_time = {
-                    // format!("{}", first_part_slow.timestamp.format("%d/%m/%Y %H:%M:%S"))
-                    let slow = first_part_slow.timestamp - challenge_start_time;
-                    let seconds = slow.num_seconds() % 60;
-                    let minutes = (slow.num_seconds() / 60) % 60;
-                    let hours = (slow.num_seconds() / 60) / 60;
-                    format!(
-                        "[{}] {:02}:{:02}:{:02}",
-                        first_part_slow.rank.unwrap(),
-                        hours,
-                        minutes,
-                        seconds,
-                    )
-                };
-                let second_part_slow_time = {
-                    // format!("{}", second_part_slow.timestamp.format("%d/%m/%Y %H:%M:%S"))
-                    let slow = second_part_slow.timestamp - challenge_start_time;
-                    let seconds = slow.num_seconds() % 60;
-                    let minutes = (slow.num_seconds() / 60) % 60;
-                    let hours = (slow.num_seconds() / 60) / 60;
-                    format!(
-                        "[{}] {:02}:{:02}:{:02}",
-                        second_part_slow.rank.unwrap(),
-                        hours,
-                        minutes,
-                        seconds,
-                    )
-                };
-                (
-                    first_part_fast_time,
-                    second_part_fast_time,
-                    first_part_slow_time,
-                    second_part_slow_time,
-                )
-            } else {
-                (
-                    "[1] N/A".to_string(),
-                    "[1] N/A".to_string(),
-                    "[100] N/A".to_string(),
-                    "[100] N/A".to_string(),
-                )
-            }
-        };
+        let challenge_start_time = challenge_release_time(year, day);
 
         // Needed for computation of deltas for members who only scored one part of the global
         // leaderboard that day.
@@ -523,46 +439,21 @@ impl ScrapedLeaderboard {
             .filter(|(_duration, rank)| rank <= &100)
             .sorted();
 
-        let (fastest_delta, slowest_delta) =
-            if let (Some((delta_fast, rank_fast)), Some((delta_slow, rank_slow))) =
-                (sorted_deltas.next(), sorted_deltas.last())
-            {
-                let seconds_fast = delta_fast.num_seconds() % 60;
-                let minutes_fast = (delta_fast.num_seconds() / 60) % 60;
-                let hours_fast = (delta_fast.num_seconds() / 60) / 60;
-                let fmt_fast = format!(
-                    "{:02}:{:02}:{:02} ({}{})",
-                    hours_fast,
-                    minutes_fast,
-                    seconds_fast,
-                    rank_fast,
-                    suffix(rank_fast)
-                );
-
-                let seconds_slow = delta_slow.num_seconds() % 60;
-                let minutes_slow = (delta_slow.num_seconds() / 60) % 60;
-                let hours_slow = (delta_slow.num_seconds() / 60) / 60;
-                let fmt_slow = format!(
-                    "{:02}:{:02}:{:02} ({}{})",
-                    hours_slow,
-                    minutes_slow,
-                    seconds_slow,
-                    rank_slow,
-                    suffix(rank_slow)
-                );
-
-                (fmt_fast, fmt_slow)
-            } else {
-                ("".to_string(), "".to_string())
-            };
-
         let statistics = LeaderboardStatistics {
-            p1_time_fast: fastest_part_one,
-            p1_time_slow: slowest_part_one,
-            p2_time_fast: fastest_part_two,
-            p2_time_slow: slowest_part_two,
-            delta_fast: fastest_delta,
-            delta_slow: slowest_delta,
+            p1_time_fast: part_1
+                .next()
+                .map_or(None, |e| Some(e.timestamp - challenge_start_time)),
+            p1_time_slow: part_1
+                .last()
+                .map_or(None, |e| Some(e.timestamp - challenge_start_time)),
+            p2_time_fast: part_2
+                .next()
+                .map_or(None, |e| Some(e.timestamp - challenge_start_time)),
+            p2_time_slow: part_2
+                .last()
+                .map_or(None, |e| Some(e.timestamp - challenge_start_time)),
+            delta_fast: sorted_deltas.next(),
+            delta_slow: sorted_deltas.last(),
         };
         statistics
     }

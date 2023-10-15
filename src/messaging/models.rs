@@ -1,4 +1,5 @@
 use crate::aoc::leaderboard::{LeaderboardStatistics, ScrapedLeaderboard};
+use crate::utils::{format_duration, suffix};
 use minijinja::{context, Environment};
 use once_cell::sync::Lazy;
 use std::fmt;
@@ -14,7 +15,7 @@ static TEMPLATES_ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
     let mut env = Environment::new();
     env.add_template(
         "hero.txt",
-        ":tada: Our very own {{ name }} made it to the global leaderboard on part {{ part }}!",
+        ":tada: Our very own *{{ name }}* made it to the global leaderboard on part {{ part }}!",
     )
     .unwrap();
     env.add_template(
@@ -23,6 +24,14 @@ static TEMPLATES_ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
         {%- for (name, score) in scores %}
             \x20 • {{name}} => {{score}}
         {%- endfor %}",
+    )
+    .unwrap();
+    env.add_template(
+        "global_leaderboard_statistics.txt",
+        ":tada: Global Leaderboard complete for *day {{day}}*, here is how it went:\n\
+            \x20 • Part 1 finish time range: *{{p1_fast}}* - *{{p1_slow}}*\n\
+            \x20 • Part 2 finish time range: *{{p2_fast}}* - *{{p2_slow}}*\n\
+            \x20 • Delta times range: {{delta_fast}} - {{delta_slow}}",
     )
     .unwrap();
 
@@ -34,7 +43,7 @@ const COMMANDS: [&'static str; 2] = ["!help", "!ranking"];
 
 #[derive(Debug)]
 pub enum Event {
-    GlobalLeaderboardComplete(LeaderboardStatistics),
+    GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
     GlobalLeaderboardHeroFound((String, String)),
     PrivateLeaderboardUpdated,
     DailySolutionsThreadToInitialize(u32),
@@ -85,19 +94,24 @@ impl fmt::Display for Event {
                 write!(f, ":point_down: Daily solution thread for day {}", day)
             }
             // TODO: do not send full global leaderboard but just what we need ?
-            Event::GlobalLeaderboardComplete(statistics) => {
+            Event::GlobalLeaderboardComplete((day, statistics)) => {
+                let template = TEMPLATES_ENVIRONMENT
+                    .get_template("global_leaderboard_statistics.txt")
+                    .unwrap();
                 write!(
                     f,
-                    ":tada: Global Leaderboard complete\n\
-                    Part 1: {} - {}\n\
-                    Part 2: {} - {}\n\
-                    Delta times range in top 100: {} - {}",
-                    statistics.p1_time_fast,
-                    statistics.p1_time_slow,
-                    statistics.p2_time_fast,
-                    statistics.p2_time_slow,
-                    statistics.delta_fast,
-                    statistics.delta_slow,
+                    "{}",
+                    template
+                        .render(context! {
+                            day => day,
+                            p1_fast => statistics.p1_time_fast.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p1_slow => statistics.p1_time_slow.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p2_fast => statistics.p2_time_fast.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p2_slow => statistics.p2_time_slow.map_or("N/A".to_string(), |d| format_duration(d)),
+                            delta_fast => statistics.delta_fast.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, suffix(rank))),
+                            delta_slow => statistics.delta_slow.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, suffix(rank))),
+                        })
+                        .unwrap()
                 )
             }
             Event::GlobalLeaderboardHeroFound((hero, part)) => {

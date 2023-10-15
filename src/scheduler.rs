@@ -229,9 +229,10 @@ async fn watch_global_leaderboard_job(
 
                             // TODO: send only needed data for announcement (fast and slow)
                             if let Err(e) = sender
-                                .send(Event::GlobalLeaderboardComplete(
+                                .send(Event::GlobalLeaderboardComplete((
+                                    day,
                                     global_leaderboard.statistics(year, day),
-                                ))
+                                )))
                                 .await
                             {
                                 let error = BotError::ChannelSend(format!(
