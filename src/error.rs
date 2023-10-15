@@ -11,6 +11,8 @@ pub enum BotError {
     IO(String),
     Scheduler(String),
     AOC(String),
+    ChannelSend(String),
+    Slack(String),
     Parse,
 }
 
@@ -28,6 +30,8 @@ impl fmt::Display for BotError {
             BotError::IO(s) => write!(f, "IO Error: {}", s),
             BotError::Scheduler(s) => write!(f, "Scheduler Error: {}", s),
             BotError::AOC(s) => write!(f, "AOC Error: {}", s),
+            BotError::ChannelSend(s) => write!(f, "MPSC Error: {}", s),
+            BotError::Slack(s) => write!(f, "Slack Communication Error: {}", s),
             BotError::Parse => write!(f, "Parse Error"),
         }
     }

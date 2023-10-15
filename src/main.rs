@@ -1,13 +1,28 @@
-use ceo_bot::messaging::client::MatterBridgeClient;
+use ceo_bot::messaging::client::AoCSlackClient;
+use ceo_bot::messaging::events::Event;
 use ceo_bot::scheduler::{JobProcess, Scheduler};
-use tokio::time::{sleep, Duration};
+use ceo_bot::storage::MemoryCache;
+
+use tokio::sync::mpsc;
+
+// use tokio::time::{sleep, Duration};
 
 use chrono::{Timelike, Utc};
-use cron::Schedule;
-use std::str::FromStr;
+use std::sync::Arc;
+use tracing::{info, Level};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+// async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let subscriber = tracing_subscriber::FmtSubscriber::builder()
+        .with_max_level(Level::INFO)
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed");
+
+    // Capacity of 64 should be more than plenty to handle all the messages
+    let (tx, mut rx) = mpsc::channel::<Event>(64);
+
     // Retrieve current minute to initialize schedule of private leaderbaord updates.
     // AoC API rules states to not fetch leaderboard at a frequency higher than 15min.
     let now = Utc::now();
@@ -17,90 +32,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // At every 15th minute from (now_minute % 15) through 59.
     let private_leaderboard_schedule = format!("{} {}/15 * 1-25 12 *", now_second, now_minute % 15);
 
-    let sched = Scheduler::new().await?;
+    // Initialize global cache
+    let cache = MemoryCache::new();
+
+    let sched = Scheduler::new(cache.clone(), Arc::new(tx.clone())).await?;
 
     let jobs = vec![
-        // JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
+        JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
         // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
         // JobProcess::UpdatePrivateLeaderboard("1/8 * * * * *"),
-        // JobProcess::WatchGlobalLeaderboard("1/20 * * * * *"),
+        // JobProcess::InitializeDailySolutionsThread("1/15 * * * * *"),
+        JobProcess::WatchGlobalLeaderboard("1/30 * * * * *"),
     ];
     for job in jobs {
         sched.add_job(job).await?;
     }
 
-    // Start the scheduler
+    info!("Starting scheduler.");
     sched.start().await?;
 
-    println!(">> Attempting stream acquisition");
-    let matterbridge = MatterBridgeClient::new("http://localhost:4243".to_string());
-    // let _stream = matterbridge.acquire_stream().await?;
-
-    loop {
-        println!(">> Attempting stream acquisition");
-        // let _stream = matterbridge.read_stream().await?;
-        match matterbridge.read_stream().await {
-            Ok(_r) => {
-                ()
-                // println!("Connected ...");
-            }
-            Err(e) => {
-                println!(">>> {:?}", e);
-                println!("[Lost stream] retrying in 5 secs ...");
-            }
-        }
-        sleep(Duration::from_millis(5000)).await;
-    }
+    info!("Initializing messaging engine.");
+    let slack_client = AoCSlackClient::new();
+    // slack_client.listen_for_events(rx).await;
+    // slack_client.start_slack_socket_mode().await?;
+    slack_client
+        .handle_messages_and_events(cache, tx, rx)
+        .await?;
+    // initialize_messaging(rx).await?;
 
     // loop {
-    //     let matterbridge = MatterBridgeClient::new("http://localhost:4243".to_string());
-    //     let stream = matterbridge.read_stream();
-    //     let res = tokio::spawn(stream).await;
-    //     match res {
-    //         Ok(output) => { /* handle successfull exit */ }
-    //         Err(err) if err.is_panic() => {
-    //             /* handle panic in task, e.g. by going around loop to restart task */
-    //             println!("YOLO ERROR")
-    //         }
-    //         Err(err) => {
-    //             /* handle other errors (mainly runtime shutdown) */
-    //             println!("ABA ERROR")
-    //         }
-    //     }
-    // }
-
-    // loop {
-    //     println!(">> Attempting stream acquisition");
-    //     let matterbridge = MatterBridgeClient::new("http://localhost:4243".to_string());
-    //     let _stream = matterbridge.acquire_stream().await?;
-    //     println!("[Lost stream] retrying ...");
     //     sleep(Duration::from_millis(5000)).await;
     // }
-
-    // while let Some(msg) = stream.read_line(&mut line).await {
-    //     println!("MSG: {:?}", msg)
-    // }
-    // while let Some(msg) = stream.next() {
-    //     println!("MSG: {:?}", msg)
-    // }
-    // // Wait while the jobs run
-
-    // loop {
-    //     let size = sched.cache_size();
-    //     let ref_count = sched.ref_count();
-
-    //     println!("[{:?}] {:?}", size, ref_count);
-    //     sleep(Duration::from_millis(5000)).await;
-    // }
-
-    //               sec  min   hour   day of month   month   day of week   year
-    // let expression = "0   30   9,12,15     1,15       May-Aug  Mon,Wed,Fri  2018/2";
-
-    // let schedule = Schedule::from_str(&private_leaderboard_schedule).unwrap();
-    // println!("Upcoming fire times:");
-    // for datetime in schedule.upcoming(Utc).take(10) {
-    //     println!("-> {}", datetime);
-    // }
-
     Ok(())
 }

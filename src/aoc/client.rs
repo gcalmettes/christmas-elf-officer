@@ -5,10 +5,7 @@ use std::fmt;
 
 use std::collections::HashMap;
 
-use crate::aoc::leaderboard::{
-    GlobalLeaderboard, GlobalLeaderboardEntry, Identifier, PrivateLeaderboard,
-    ScrapedPrivateLeaderboard, Solution,
-};
+use crate::aoc::leaderboard::{Identifier, Leaderboard, ProblemPart, ScrapedLeaderboard, Solution};
 use crate::error::{BotError, BotResult};
 
 enum Endpoint {
@@ -92,10 +89,13 @@ impl AoC {
         Ok(resp)
     }
 
-    pub async fn global_leaderboard(&self, year: i32, day: u8) -> BotResult<GlobalLeaderboard> {
+    pub async fn global_leaderboard(&self, year: i32, day: u8) -> BotResult<ScrapedLeaderboard> {
         let leaderboard_response = self.get_global_leaderboard(year, day).await?;
         let leaderboard = AoC::parse_global_leaderboard(&leaderboard_response, year, day)?;
-        Ok(leaderboard)
+        Ok(ScrapedLeaderboard {
+            timestamp: Utc::now(),
+            leaderboard,
+        })
     }
 
     async fn get_private_leaderboard(&self, year: i32) -> BotResult<String> {
@@ -106,33 +106,75 @@ impl AoC {
         Ok(resp)
     }
 
-    pub async fn private_leaderboard(&self, year: i32) -> BotResult<ScrapedPrivateLeaderboard> {
+    pub async fn private_leaderboard(&self, year: i32) -> BotResult<ScrapedLeaderboard> {
         let leaderboard_response = self.get_private_leaderboard(year).await?;
         let leaderboard = AoC::parse_private_leaderboard(&leaderboard_response)?;
-        Ok(ScrapedPrivateLeaderboard {
+        Ok(ScrapedLeaderboard {
             timestamp: Utc::now(),
             leaderboard,
         })
     }
 
-    fn parse_global_leaderboard(
-        leaderboard: &str,
-        year: i32,
-        day: u8,
-    ) -> BotResult<GlobalLeaderboard> {
+    fn parse_global_leaderboard(leaderboard: &str, year: i32, day: u8) -> BotResult<Leaderboard> {
+        // The HTML document is organized like so:
+        //
+        //      <p>First hundred users to get <span class="leaderboard-daydesc-both">both stars</span> on Day XX:</p>
+        //      <div>some entry</div>
+        //      <div>some entry</div>
+        //      <p>First hundred users to get the <span class="leaderboard-daydesc-first">first star</span> on Day XX:</p>
+        //      <div>some entry</div>
+        //      <div>some entry</div>
+        //
+        // Instead of just selecting all the div and having some logic based on parsing to get the
+        // entries associated with the first or second part, we will directly extract the part
+        // information based on the siblings of the <p> elements.
+
         let document = Html::parse_document(&leaderboard);
+        let selector_first_part = Selector::parse(r#"span.leaderboard-daydesc-first"#).unwrap();
+        let selector_second_part = Selector::parse(r#"span.leaderboard-daydesc-both"#).unwrap();
 
-        let selector = Selector::parse(r#"div.leaderboard-entry"#).unwrap();
+        // Entries first part. The selector will only give us the div below the p>span.leaderboard-daydesc-first element
+        let entries_first = match document.select(&selector_first_part).last() {
+            Some(span) => span.parent().map_or(vec![], |p| {
+                p.next_siblings()
+                    .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
+                    .filter_map(|entry| Solution::from_html(entry, year, day, ProblemPart::FIRST))
+                    .collect::<Vec<Solution>>()
+            }),
+            _ => vec![],
+        };
 
-        let entries = document
-            .select(&selector)
-            .filter_map(|entry| GlobalLeaderboardEntry::from_html(entry, year, day))
-            .collect::<Vec<GlobalLeaderboardEntry>>();
+        // Because the p>span.leaderboard-daydesc-both element is at the top, the selector will give us the entry divs for both parts.
+        // We will need to filter out entries already matched in first part.
+        let entries_second = match document.select(&selector_second_part).last() {
+            Some(span) => span.parent().map_or(vec![], |p| {
+                p.next_siblings()
+                    .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
+                    .filter_map(|entry| Solution::from_html(entry, year, day, ProblemPart::SECOND))
+                    // Filter out entries of first part.
+                    .filter(|e| {
+                        !entries_first.contains(&Solution {
+                            id: e.id.clone(),
+                            timestamp: e.timestamp,
+                            rank: e.rank,
+                            day: e.day,
+                            year: e.year,
+                            part: ProblemPart::FIRST,
+                        })
+                    })
+                    .collect::<Vec<Solution>>()
+            }),
+            _ => vec![],
+        };
 
-        Ok(GlobalLeaderboard(entries))
+        let mut all_entries = Leaderboard::new();
+        all_entries.extend(entries_first);
+        all_entries.extend(entries_second);
+
+        Ok(all_entries)
     }
 
-    fn parse_private_leaderboard(leaderboard: &str) -> BotResult<PrivateLeaderboard> {
+    fn parse_private_leaderboard(leaderboard: &str) -> BotResult<Leaderboard> {
         // Response from AOC private leaderboard API.
         // Structs defined here as it is only used by this function.
         use serde::Deserialize;
@@ -164,7 +206,7 @@ impl AoC {
         }
 
         let parsed = serde_json::from_str::<AOCPrivateLeaderboardResponse>(&leaderboard).unwrap();
-        let mut earned_stars = PrivateLeaderboard::new();
+        let mut earned_stars = Leaderboard::new();
 
         for (_, member) in parsed.members.iter() {
             let name = match &member.name {
@@ -174,6 +216,7 @@ impl AoC {
 
             for (day, stars) in member.completion_day_level.iter() {
                 for (star, info) in stars.iter() {
+                    let star = star.parse().map_err(|_| BotError::Parse)?;
                     earned_stars.push(Solution {
                         timestamp: Utc
                             .timestamp_opt(info.get_star_ts, 0)
@@ -181,7 +224,8 @@ impl AoC {
                             .ok_or(BotError::Parse)?,
                         year: parsed.event.parse().map_err(|_| BotError::Parse)?,
                         day: day.parse::<u8>().map_err(|_| BotError::Parse)?,
-                        part: star.parse().map_err(|_| BotError::Parse)?,
+                        part: ProblemPart::from(star),
+                        rank: None,
                         id: Identifier {
                             name: name.clone(),
                             numeric: member.id,
