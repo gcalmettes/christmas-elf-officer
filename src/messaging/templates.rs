@@ -24,6 +24,7 @@ pub enum MessageTemplate {
     DailyChallenge,
     DailySolutionThread,
     GlobalStatistics,
+    PrivateLeaderboardUpdated,
     Ranking,
     Hero,
 }
@@ -34,6 +35,7 @@ impl MessageTemplate {
             MessageTemplate::Help => "help.txt",
             MessageTemplate::DailyChallenge => "challenge.txt",
             MessageTemplate::DailySolutionThread => "solution_thread.txt",
+            MessageTemplate::PrivateLeaderboardUpdated => "private_leaderboard_updated.txt",
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
             MessageTemplate::Ranking => "ranking.txt",
             MessageTemplate::Hero => "hero.txt",
@@ -61,6 +63,9 @@ impl MessageTemplate {
             },
             MessageTemplate::DailySolutionThread => {
                 ":point_down: Daily solution thread for *day {{day}}*"
+            },
+            MessageTemplate::PrivateLeaderboardUpdated => {
+                ":repeat: Private Leaderboard successfully updated!"
             },
             MessageTemplate::GlobalStatistics => {
                 ":tada: Global Leaderboard complete for *day {{day}}*, here is how it went for the big dogs:\n\

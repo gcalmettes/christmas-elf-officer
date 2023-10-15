@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         JobProcess::UpdatePrivateLeaderboard("1/8 * * * * *"),
         // JobProcess::InitializeDailySolutionsThread("1/15 * * * * *"),
         // JobProcess::WatchGlobalLeaderboard("1/30 * * * * *"),
-        JobProcess::ParseDailyChallenge("1/5 * * * * *"),
+        JobProcess::ParseDailyChallenge("1/20 * * * * *"),
     ];
     for job in jobs {
         sched.add_job(job).await?;

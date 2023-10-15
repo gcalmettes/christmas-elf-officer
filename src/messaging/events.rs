@@ -109,7 +109,14 @@ impl fmt::Display for Event {
                 )
             }
             Event::PrivateLeaderboardUpdated => {
-                write!(f, ":repeat: Private Leaderboard updated")
+                write!(
+                    f,
+                    "{}",
+                    MessageTemplate::PrivateLeaderboardUpdated
+                        .get()
+                        .render({})
+                        .unwrap()
+                )
             }
             Event::CommandReceived(_channel_id, ts, cmd) => match cmd {
                 Command::Help => {
