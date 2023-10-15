@@ -9,6 +9,7 @@ use scheduler::{JobProcess, Scheduler};
 use storage::MemoryCache;
 
 pub mod aoc;
+pub mod config;
 pub mod error;
 pub mod messaging;
 pub mod scheduler;
@@ -18,8 +19,10 @@ pub mod utils;
 #[tokio::main]
 // async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let settings = &config::SETTINGS;
+
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
+        .with_max_level(settings.get_trace_level())
         .finish();
 
     tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed");

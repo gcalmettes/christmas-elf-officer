@@ -24,7 +24,7 @@ chrono = "0.4.26"
 ##################################
 # to be removed
 cron = "0.12.0"
-figment = { version = "0.10.11", features = ["env"] }
+figment = { version = "0.10.11", features = ["env", "yaml"] }
 ##################################
 futures = "0.3.28"
 http = "0.2.9"

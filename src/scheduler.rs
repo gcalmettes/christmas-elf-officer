@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use crate::aoc::client::AoC;
 use crate::aoc::leaderboard::{Identifier, ProblemPart};
+use crate::config;
 use crate::error::{BotError, BotResult};
 use crate::messaging::events::Event;
 use crate::storage::MemoryCache;
@@ -168,10 +169,12 @@ async fn watch_global_leaderboard_job(
         let sender = sender.clone();
 
         Box::pin(async move {
+            let settings = &config::SETTINGS;
             let aoc_client = AoC::new();
 
-            //TODO: set interval to what we want
-            let mut interval = time::interval(Duration::from_secs(3));
+            let mut interval = time::interval(Duration::from_secs(
+                settings.global_leaderboard_polling_interval_sec,
+            ));
 
             //TODO: Set year and day programmatically from Utc::now()
 
@@ -201,7 +204,6 @@ async fn watch_global_leaderboard_job(
                                 .check_for_private_members(&private_leaderboard.leaderboard)
                         };
 
-                        // TODO: replace with function that sends message to matterbridge
                         for hero_hit in hero_hits {
                             // If not already known, send shoutout to hero
                             if !known_hero_hits.contains(&hero_hit) {
@@ -227,7 +229,6 @@ async fn watch_global_leaderboard_job(
                         if global_leaderboard_is_complete {
                             info!("Global Leaderboard for day {day} is complete!");
 
-                            // TODO: send only needed data for announcement (fast and slow)
                             if let Err(e) = sender
                                 .send(Event::GlobalLeaderboardComplete((
                                     day,

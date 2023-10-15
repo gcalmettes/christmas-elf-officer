@@ -1,3 +1,4 @@
+use crate::config;
 use crate::error::BotError;
 use crate::messaging::events::{Command, Event};
 use crate::storage::MemoryCache;
@@ -44,16 +45,12 @@ impl AoCSlackClient {
     // Spaw listener for events and post corresponding annoucements/messages
     async fn listen_for_events(&self, mut rx: Receiver<Event>) {
         let client = self.client.clone();
-        // let cache = self.cache.clone();
 
         tokio::spawn(async move {
+            let settings = &config::SETTINGS;
             while let Some(event) = rx.recv().await {
-                // TODO: get slack channel name or id by config/settings
-                // TODO: get other app env vars by config/settings
-
-                let channel_id = SlackChannelId("C01T7GWLAVB".to_string());
-                let app_token_value: SlackApiTokenValue =
-                    config_env_var("SLACK_TEST_TOKEN").unwrap().into();
+                let channel_id = SlackChannelId(settings.slack_default_channel.to_string());
+                let app_token_value: SlackApiTokenValue = settings.slack_token.to_string().into();
                 let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
                 let session = client.open_session(&app_token);
 
@@ -108,6 +105,7 @@ impl AoCSlackClient {
         cache: MemoryCache,
         tx: Sender<Event>,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let settings = &config::SETTINGS;
         let socket_mode_callbacks = SlackSocketModeListenerCallbacks::new()
             .with_push_events(push_events_socket_mode_function);
 
@@ -126,7 +124,7 @@ impl AoCSlackClient {
             socket_mode_callbacks,
         );
 
-        let app_token_value: SlackApiTokenValue = config_env_var("SLACK_TEST_APP_TOKEN")?.into();
+        let app_token_value: SlackApiTokenValue = settings.slack_app_token.to_string().into();
         let app_token: SlackApiToken = SlackApiToken::new(app_token_value);
 
         socket_mode_listener.listen_for(&app_token).await?;
@@ -191,11 +189,6 @@ fn error_handler(
     // https://api.slack.com/apis/connections/socket-implement#acknowledge
     // so that Slack knows whether to retry
     StatusCode::OK
-}
-
-// TODO: will be removed once Figment config is used
-pub fn config_env_var(name: &str) -> Result<String, String> {
-    std::env::var(name).map_err(|e| format!("{}: {}", name, e))
 }
 
 // fn has_command(message: &Option<String>) -> Option<String> {

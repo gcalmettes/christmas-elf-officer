@@ -7,6 +7,7 @@ pub type BotResult<T> = Result<T, BotError>;
 
 #[derive(Debug)]
 pub enum BotError {
+    Config(String),
     Http(String),
     IO(String),
     Scheduler(String),
@@ -26,6 +27,7 @@ pub fn convert_err(e: reqwest::Error) -> std::io::Error {
 impl fmt::Display for BotError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
+            BotError::Config(s) => write!(f, "Configuration Error: {}", s),
             BotError::Http(s) => write!(f, "HTTP Error: {}", s),
             BotError::IO(s) => write!(f, "IO Error: {}", s),
             BotError::Scheduler(s) => write!(f, "Scheduler Error: {}", s),
