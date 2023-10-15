@@ -1,5 +1,5 @@
 use ceo_bot::messaging::client::AoCSlackClient;
-use ceo_bot::messaging::models::Event;
+use ceo_bot::messaging::events::Event;
 use ceo_bot::scheduler::{JobProcess, Scheduler};
 use ceo_bot::storage::MemoryCache;
 

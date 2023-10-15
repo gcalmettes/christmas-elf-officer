@@ -1,3 +1,3 @@
 pub mod client;
-pub mod models;
+pub mod events;
 pub mod templates;

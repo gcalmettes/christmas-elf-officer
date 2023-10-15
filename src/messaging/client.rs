@@ -1,5 +1,5 @@
 use crate::error::BotError;
-use crate::messaging::models::{Command, Event};
+use crate::messaging::events::{Command, Event};
 use crate::storage::MemoryCache;
 use http::StatusCode;
 use slack_morphism::{
@@ -12,7 +12,7 @@ use slack_morphism::{
 };
 use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tracing::{error, info};
+use tracing::error;
 
 pub struct AoCSlackClient {
     client: Arc<SlackHyperClient>,

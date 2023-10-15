@@ -10,7 +10,7 @@ use std::sync::Arc;
 use crate::aoc::client::AoC;
 use crate::aoc::leaderboard::{Identifier, ProblemPart};
 use crate::error::{BotError, BotResult};
-use crate::messaging::models::Event;
+use crate::messaging::events::Event;
 use crate::storage::MemoryCache;
 
 pub struct Scheduler {
