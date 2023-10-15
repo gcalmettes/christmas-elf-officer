@@ -1,41 +1,28 @@
 use minijinja::{Environment, Template};
 use once_cell::sync::Lazy;
+
+use strum::{EnumIter, IntoEnumIterator};
 use tracing::info;
 
 static TEMPLATES_ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
     info!("Initializing templating engine environment.");
     let mut env = Environment::new();
 
-    env.add_template(
-        MessageTemplate::Help.name(),
-        MessageTemplate::Help.template(),
-    )
-    .unwrap();
-
-    env.add_template(
-        MessageTemplate::Hero.name(),
-        MessageTemplate::Hero.template(),
-    )
-    .unwrap();
-
-    env.add_template(
-        MessageTemplate::Ranking.name(),
-        MessageTemplate::Ranking.template(),
-    )
-    .unwrap();
-
-    env.add_template(
-        MessageTemplate::GlobalStatistics.name(),
-        MessageTemplate::GlobalStatistics.template(),
-    )
-    .unwrap();
+    // Use strum to iterate over the variants of the enum.
+    for template in MessageTemplate::iter() {
+        env.add_template(template.name(), template.template())
+            .unwrap();
+    }
 
     info!("Templates loaded in templating engine environment.");
     env
 });
 
+#[derive(EnumIter)]
 pub enum MessageTemplate {
     Help,
+    DailyChallenge,
+    DailySolutionThread,
     GlobalStatistics,
     Ranking,
     Hero,
@@ -45,6 +32,8 @@ impl MessageTemplate {
     pub fn name(&self) -> &'static str {
         match self {
             MessageTemplate::Help => "help.txt",
+            MessageTemplate::DailyChallenge => "challenge.txt",
+            MessageTemplate::DailySolutionThread => "solution_thread.txt",
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
             MessageTemplate::Ranking => "ranking.txt",
             MessageTemplate::Hero => "hero.txt",
@@ -64,6 +53,14 @@ impl MessageTemplate {
                     \x20   `!help`: the commands\n\
                     \x20   `!ranking`: current ranking by local score\n\
                 "
+            },
+            MessageTemplate::DailyChallenge => {
+                ":tada: Today's challenge is up!\n\
+                    \x20 *{{title}}*
+                "
+            },
+            MessageTemplate::DailySolutionThread => {
+                ":point_down: Daily solution thread for *day {{day}}*"
             },
             MessageTemplate::GlobalStatistics => {
                 ":tada: Global Leaderboard complete for *day {{day}}*, here is how it went for the big dogs:\n\

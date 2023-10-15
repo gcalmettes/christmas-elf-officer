@@ -15,6 +15,7 @@ const COMMANDS: [&'static str; 2] = ["!help", "!ranking"];
 pub enum Event {
     GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
     GlobalLeaderboardHeroFound((String, String)),
+    DailyChallengeIsUp(String),
     PrivateLeaderboardUpdated,
     DailySolutionsThreadToInitialize(u32),
     CommandReceived(SlackChannelId, SlackTs, Command),
@@ -61,7 +62,24 @@ impl fmt::Display for Event {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Event::DailySolutionsThreadToInitialize(day) => {
-                write!(f, ":point_down: Daily solution thread for day {}", day)
+                write!(
+                    f,
+                    "{}",
+                    MessageTemplate::DailySolutionThread
+                        .get()
+                        .render(context! { day => day })
+                        .unwrap()
+                )
+            }
+            Event::DailyChallengeIsUp(title) => {
+                write!(
+                    f,
+                    "{}",
+                    MessageTemplate::DailyChallenge
+                        .get()
+                        .render(context! { title => title })
+                        .unwrap()
+                )
             }
             Event::GlobalLeaderboardComplete((day, statistics)) => {
                 write!(

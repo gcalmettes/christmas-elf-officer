@@ -57,42 +57,58 @@ impl AoCSlackClient {
                 let response_text = event.to_string();
 
                 let response = match &event {
+                    Event::PrivateLeaderboardUpdated => {
+                        if let Some(channel_id) = &settings.slack_monitoring_channel {
+                            Some(SlackApiChatPostMessageRequest::new(
+                                SlackChannelId(channel_id.to_string()),
+                                SlackMessageContent::new().with_text(response_text),
+                            ))
+                        } else {
+                            None
+                        }
+                    }
                     Event::CommandReceived(channel_id, thread_ts, _cmd) => {
                         // let data = cache.data.lock().unwrap();
                         // // TODO: inject timestamp too
                         // let ranking = data.leaderboard.standings_by_local_score();
 
-                        SlackApiChatPostMessageRequest::new(
-                            channel_id.clone(),
-                            SlackMessageContent::new().with_text(response_text),
+                        Some(
+                            SlackApiChatPostMessageRequest::new(
+                                channel_id.clone(),
+                                SlackMessageContent::new().with_text(response_text),
+                            )
+                            .with_thread_ts(thread_ts.clone()),
                         )
-                        .with_thread_ts(thread_ts.clone())
                     }
-                    _ => SlackApiChatPostMessageRequest::new(
+                    _ => Some(SlackApiChatPostMessageRequest::new(
                         channel_id.clone(),
                         SlackMessageContent::new().with_text(response_text),
-                    ),
+                    )),
                 };
 
-                match session.chat_post_message(&response).await {
-                    Err(e) => {
-                        let error = BotError::Slack(e.to_string());
-                        error!("{error}");
-                    }
-                    Ok(res) => {
-                        // If Solution thread initialization, post a first message in thread
-                        if let Event::DailySolutionsThreadToInitialize(_day) = event {
-                            let thread_ts = res.ts;
-                            let message = format!("Show me your best move!");
-                            let first_thread_message = SlackApiChatPostMessageRequest::new(
-                                channel_id,
-                                SlackMessageContent::new().with_text(message),
-                            )
-                            .with_thread_ts(thread_ts);
-                            if let Err(e) = session.chat_post_message(&first_thread_message).await {
-                                let error = BotError::Slack(e.to_string());
-                                error!("{error}");
-                            };
+                if let Some(response) = response {
+                    match session.chat_post_message(&response).await {
+                        Err(e) => {
+                            let error = BotError::Slack(e.to_string());
+                            error!("{error}");
+                        }
+                        Ok(res) => {
+                            // If Solution thread initialization, post a first message in thread
+                            if let Event::DailySolutionsThreadToInitialize(_day) = event {
+                                let thread_ts = res.ts;
+                                let message = format!("Show me your best move!");
+                                let first_thread_message = SlackApiChatPostMessageRequest::new(
+                                    channel_id,
+                                    SlackMessageContent::new().with_text(message),
+                                )
+                                .with_thread_ts(thread_ts);
+                                if let Err(e) =
+                                    session.chat_post_message(&first_thread_message).await
+                                {
+                                    let error = BotError::Slack(e.to_string());
+                                    error!("{error}");
+                                };
+                            }
                         }
                     }
                 }

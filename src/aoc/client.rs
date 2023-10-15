@@ -1,6 +1,6 @@
 use chrono::{TimeZone, Utc};
 use reqwest::{Client, StatusCode};
-use scraper::{Html, Selector};
+use scraper::{Html, Node, Selector};
 use std::fmt;
 
 use std::collections::HashMap;
@@ -11,6 +11,7 @@ use crate::error::{BotError, BotResult};
 
 enum Endpoint {
     GlobalLeaderboard(i32, u8),
+    DailyChallenge(i32, u8),
     PrivateLeaderboard(i32, u64),
 }
 
@@ -19,6 +20,9 @@ impl fmt::Display for Endpoint {
         match self {
             Endpoint::GlobalLeaderboard(year, day) => {
                 write!(f, "/{}/leaderboard/day/{}", year, day)
+            }
+            Endpoint::DailyChallenge(year, day) => {
+                write!(f, "/{}/day/{}", year, day)
             }
             Endpoint::PrivateLeaderboard(year, id) => {
                 write!(f, "/{}/leaderboard/private/view/{}.json", year, id)
@@ -85,6 +89,17 @@ impl AoC {
         })
     }
 
+    async fn get_daily_challenge(&self, year: i32, day: u8) -> BotResult<String> {
+        let endpoint = Endpoint::DailyChallenge(year, day);
+        let resp = self.get(&endpoint, None).await?;
+        Ok(resp)
+    }
+
+    pub async fn daily_challenge(&self, year: i32, day: u8) -> BotResult<String> {
+        let daily_challenge = self.get_daily_challenge(year, day).await?;
+        let title = AoC::parse_daily_challenge_title(&daily_challenge)?;
+        Ok(title)
+    }
     async fn get_private_leaderboard(&self, year: i32) -> BotResult<String> {
         let endpoint = Endpoint::PrivateLeaderboard(year, self.private_leaderboard_id);
         let resp = self
@@ -100,6 +115,18 @@ impl AoC {
             timestamp: Utc::now(),
             leaderboard,
         })
+    }
+
+    fn parse_daily_challenge_title(challenge: &str) -> BotResult<String> {
+        let document = Html::parse_document(&challenge);
+        let selector_title = Selector::parse(r#"article.day-desc > h2"#).unwrap();
+
+        let default = "N/A";
+        let title = document
+            .select(&selector_title)
+            .next()
+            .map_or(default, |node| node.text().next().map_or(default, |t| t));
+        Ok(title.to_string())
     }
 
     fn parse_global_leaderboard(leaderboard: &str, year: i32, day: u8) -> BotResult<Leaderboard> {
@@ -121,38 +148,46 @@ impl AoC {
         let selector_second_part = Selector::parse(r#"span.leaderboard-daydesc-both"#).unwrap();
 
         // Entries first part. The selector will only give us the div below the p>span.leaderboard-daydesc-first element
-        let entries_first = match document.select(&selector_first_part).last() {
-            Some(span) => span.parent().map_or(vec![], |p| {
-                p.next_siblings()
-                    .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
-                    .filter_map(|entry| Solution::from_html(entry, year, day, ProblemPart::FIRST))
-                    .collect::<Vec<Solution>>()
-            }),
-            _ => vec![],
-        };
+        let entries_first = document
+            .select(&selector_first_part)
+            .last()
+            .map_or(vec![], |span| {
+                span.parent().map_or(vec![], |p| {
+                    p.next_siblings()
+                        .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
+                        .filter_map(|entry| {
+                            Solution::from_html(entry, year, day, ProblemPart::FIRST)
+                        })
+                        .collect::<Vec<Solution>>()
+                })
+            });
 
         // Because the p>span.leaderboard-daydesc-both element is at the top, the selector will give us the entry divs for both parts.
         // We will need to filter out entries already matched in first part.
-        let entries_second = match document.select(&selector_second_part).last() {
-            Some(span) => span.parent().map_or(vec![], |p| {
-                p.next_siblings()
-                    .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
-                    .filter_map(|entry| Solution::from_html(entry, year, day, ProblemPart::SECOND))
-                    // Filter out entries of first part.
-                    .filter(|e| {
-                        !entries_first.contains(&Solution {
-                            id: e.id.clone(),
-                            timestamp: e.timestamp,
-                            rank: e.rank,
-                            day: e.day,
-                            year: e.year,
-                            part: ProblemPart::FIRST,
+        let entries_second = document
+            .select(&selector_second_part)
+            .last()
+            .map_or(vec![], |span| {
+                span.parent().map_or(vec![], |p| {
+                    p.next_siblings()
+                        .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
+                        .filter_map(|entry| {
+                            Solution::from_html(entry, year, day, ProblemPart::SECOND)
                         })
-                    })
-                    .collect::<Vec<Solution>>()
-            }),
-            _ => vec![],
-        };
+                        // Filter out entries of first part.
+                        .filter(|e| {
+                            !entries_first.contains(&Solution {
+                                id: e.id.clone(),
+                                timestamp: e.timestamp,
+                                rank: e.rank,
+                                day: e.day,
+                                year: e.year,
+                                part: ProblemPart::FIRST,
+                            })
+                        })
+                        .collect::<Vec<Solution>>()
+                })
+            });
 
         let mut all_entries = Leaderboard::new();
         all_entries.extend(entries_first);

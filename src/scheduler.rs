@@ -25,6 +25,7 @@ pub enum JobProcess<'schedule> {
     InitializeDailySolutionsThread(&'schedule str),
     UpdatePrivateLeaderboard(&'schedule str),
     WatchGlobalLeaderboard(&'schedule str),
+    ParseDailyChallenge(&'schedule str),
 }
 
 impl Scheduler {
@@ -53,6 +54,9 @@ impl Scheduler {
             JobProcess::WatchGlobalLeaderboard(schedule) => {
                 watch_global_leaderboard_job(schedule, self.cache.clone(), self.sender.clone())
                     .await?
+            }
+            JobProcess::ParseDailyChallenge(schedule) => {
+                parse_daily_challenge_job(schedule, self.sender.clone()).await?
             }
         };
         Ok(self.scheduler.add(job).await?)
@@ -252,6 +256,42 @@ async fn watch_global_leaderboard_job(
 
                 interval.tick().await;
             }
+        })
+    })?;
+    Ok(job)
+}
+
+async fn parse_daily_challenge_job(schedule: &str, sender: Arc<Sender<Event>>) -> BotResult<Job> {
+    let job = Job::new_async(schedule, move |uuid, mut l| {
+        let sender = sender.clone();
+        Box::pin(async move {
+            let aoc_client = AoC::new();
+
+            //TODO: Set year and day programmatically from Utc::now()
+
+            // let now = Utc::now();
+            // let year = now.year();
+            // let day = now.day() as u8;
+
+            let (year, day) = (2022, 9);
+
+            info!("Retrieving challenge title for day {day}.");
+
+            info!("Global Leaderboard for day {day} not complete yet.");
+            match aoc_client.daily_challenge(year, day).await {
+                Ok(title) => {
+                    if let Err(e) = sender.send(Event::DailyChallengeIsUp(title.clone())).await {
+                        let error = BotError::ChannelSend(format!(
+                            "Could not send message to MPSC channel. {e}"
+                        ));
+                        error!("{error}");
+                    };
+                }
+                Err(e) => {
+                    let error = BotError::AOC(format!("Could not scrape global leaderboard. {e}"));
+                    error!("{error}");
+                }
+            };
         })
     })?;
     Ok(job)
