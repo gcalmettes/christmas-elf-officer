@@ -66,7 +66,7 @@ impl MessageTemplate {
                 "
             },
             MessageTemplate::GlobalStatistics => {
-                ":tada: Global Leaderboard complete for *day {{day}}*, here is how it went:\n\
+                ":tada: Global Leaderboard complete for *day {{day}}*, here is how it went for the big dogs:\n\
                     \x20 • Part 1 finish time range: *{{p1_fast}}* - *{{p1_slow}}*\n\
                     \x20 • Part 2 finish time range: *{{p2_fast}}* - *{{p2_slow}}*\n\
                     \x20 • Delta times range: {{delta_fast}} - {{delta_slow}}"
