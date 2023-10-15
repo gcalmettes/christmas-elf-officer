@@ -34,7 +34,7 @@ fn default_aoc_api_timeout_sec() -> u64 {
 }
 
 fn default_aoc_base_url() -> String {
-    "http://localhost:5001".to_string()
+    "https://adventofcode.com".to_string()
 }
 
 // Settings are a singleton generated at runtime. All settings may be
@@ -48,8 +48,11 @@ pub struct Settings {
     pub slack_token: String,
     pub slack_app_token: String,
     pub slack_default_channel: String,
+    // Channel to reveive heartbeats and monitoring events
+    pub slack_monitoring_channel: Option<String>,
     #[serde(default = "default_global_leaderboard_polling_interval_sec")]
     pub global_leaderboard_polling_interval_sec: u64,
+    #[serde(default = "default_aoc_base_url")]
     pub aoc_base_url: String,
     #[serde(default = "default_aoc_api_timeout_sec")]
     pub aoc_api_timeout_sec: u64,
