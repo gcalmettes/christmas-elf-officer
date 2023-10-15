@@ -15,6 +15,7 @@ static TEMPLATES_ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
     }
 
     info!("Templates loaded in templating engine environment.");
+
     env
 });
 
