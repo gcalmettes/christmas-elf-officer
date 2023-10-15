@@ -1,6 +1,6 @@
 use crate::utils::challenge_release_time;
 use chrono::naive::NaiveDateTime;
-use chrono::{DateTime, Duration, Local, Utc};
+use chrono::{DateTime, Duration, Utc};
 use itertools::Itertools;
 use scraper::{Node, Selector};
 use std::cmp::Reverse;

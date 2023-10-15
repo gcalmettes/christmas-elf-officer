@@ -14,13 +14,13 @@ use std::sync::Arc;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::error;
 
-pub struct AoCSlackClient {
-    client: Arc<SlackHyperClient>,
+struct MyEnvironment {
+    sender: Arc<Sender<Event>>,
+    cache: MemoryCache,
 }
 
-pub struct MyEnvironment {
-    pub sender: Arc<Sender<Event>>,
-    pub cache: MemoryCache,
+pub struct AoCSlackClient {
+    client: Arc<SlackHyperClient>,
 }
 
 impl AoCSlackClient {
@@ -193,6 +193,7 @@ fn error_handler(
     StatusCode::OK
 }
 
+// TODO: will be removed once Figment config is used
 pub fn config_env_var(name: &str) -> Result<String, String> {
     std::env::var(name).map_err(|e| format!("{}: {}", name, e))
 }
