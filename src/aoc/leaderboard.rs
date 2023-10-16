@@ -177,6 +177,7 @@ impl Leaderboard {
         self.iter().into_group_map_by(|a| &a.id)
     }
 
+    /// Idem, but for a specific day
     fn solutions_per_member_for_day(&self, day: u8) -> HashMap<&Identifier, Vec<&Solution>> {
         self.iter()
             .filter(|s| s.day == day)
@@ -248,16 +249,11 @@ impl Leaderboard {
     pub fn compute_diffs(&self, current_leaderboard: &Leaderboard) -> Vec<&Solution> {
         let current_solutions = current_leaderboard
             .iter()
-            .map(|s| (s.id.numeric, s.day, s.part));
+            .map(|s| (s.id.numeric, s.day, s.part))
+            .collect::<Vec<(u64, u8, ProblemPart)>>();
 
         self.iter()
-            // The curent_solutions iterator needs to be cloned as .contains() consumes it partially
-            // (or totally if no match found)
-            .filter(|s| {
-                !current_solutions
-                    .clone()
-                    .contains(&(s.id.numeric, s.day, s.part))
-            })
+            .filter(|s| !current_solutions.contains(&(s.id.numeric, s.day, s.part)))
             .collect()
     }
 
