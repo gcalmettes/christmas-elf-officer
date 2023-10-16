@@ -177,6 +177,12 @@ impl Leaderboard {
         self.iter().into_group_map_by(|a| &a.id)
     }
 
+    fn solutions_per_member_for_day(&self, day: u8) -> HashMap<&Identifier, Vec<&Solution>> {
+        self.iter()
+            .filter(|s| s.day == day)
+            .into_group_map_by(|a| &a.id)
+    }
+
     fn solutions_per_challenge(&self) -> HashMap<(u8, ProblemPart), Vec<&Solution>> {
         self.iter().into_group_map_by(|a| (a.day, a.part))
     }
@@ -304,20 +310,19 @@ impl Leaderboard {
 
     // ranking by time between part 1 and part 2 completions
     pub fn standings_by_delta_for_day(&self, day: u8) -> Vec<(String, Duration)> {
-        self.solutions_per_member()
+        self.solutions_per_member_for_day(day)
             .into_iter()
-            .filter_map(|(id, solutions)| {
-                let solutions_for_day = solutions.iter().filter(|s| s.day == day);
-                match solutions_for_day.clone().count() {
-                    0 | 1 => None,
-                    2 => {
-                        let mut ordered_parts =
-                            solutions_for_day.sorted_by_key(|s| s.timestamp).tuples();
-                        let (first, second) = ordered_parts.next().unwrap();
-                        Some((id.name.clone(), second.timestamp - first.timestamp))
-                    }
-                    _ => unreachable!(),
+            .filter_map(|(id, solutions_for_day)| match solutions_for_day.len() {
+                0 | 1 => None,
+                2 => {
+                    let mut ordered_parts = solutions_for_day
+                        .iter()
+                        .sorted_by_key(|s| s.timestamp)
+                        .tuples();
+                    let (first, second) = ordered_parts.next().unwrap();
+                    Some((id.name.clone(), second.timestamp - first.timestamp))
                 }
+                _ => unreachable!(),
             })
             .sorted_by_key(|r| r.1)
             .collect::<Vec<(String, Duration)>>()
