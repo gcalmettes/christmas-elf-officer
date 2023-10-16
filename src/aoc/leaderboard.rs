@@ -125,7 +125,7 @@ impl Solution {
                 Some(t) => t
                     .split(")")
                     .next()
-                    .map_or(None, |rank| rank.trim().parse::<u8>().ok()),
+                    .and_then(|rank| rank.trim().parse::<u8>().ok()),
                 None => None,
             },
             None => None,
@@ -442,16 +442,16 @@ impl ScrapedLeaderboard {
         let statistics = LeaderboardStatistics {
             p1_time_fast: part_1
                 .next()
-                .map_or(None, |e| Some(e.timestamp - challenge_start_time)),
+                .and_then(|e| Some(e.timestamp - challenge_start_time)),
             p1_time_slow: part_1
                 .last()
-                .map_or(None, |e| Some(e.timestamp - challenge_start_time)),
+                .and_then(|e| Some(e.timestamp - challenge_start_time)),
             p2_time_fast: part_2
                 .next()
-                .map_or(None, |e| Some(e.timestamp - challenge_start_time)),
+                .and_then(|e| Some(e.timestamp - challenge_start_time)),
             p2_time_slow: part_2
                 .last()
-                .map_or(None, |e| Some(e.timestamp - challenge_start_time)),
+                .and_then(|e| Some(e.timestamp - challenge_start_time)),
             delta_fast: sorted_deltas.next(),
             delta_slow: sorted_deltas.last(),
         };

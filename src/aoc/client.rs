@@ -125,7 +125,7 @@ impl AoC {
         let title = document
             .select(&selector_title)
             .next()
-            .map_or(default, |node| node.text().next().map_or(default, |t| t));
+            .map_or(default, |node| node.text().next().unwrap_or(default));
         Ok(title.to_string())
     }
 
