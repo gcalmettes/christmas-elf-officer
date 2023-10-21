@@ -34,7 +34,7 @@ impl fmt::Display for BotError {
             BotError::AOC(s) => write!(f, "AOC Error: {}", s),
             BotError::ChannelSend(s) => write!(f, "MPSC Error: {}", s),
             BotError::Slack(s) => write!(f, "Slack Communication Error: {}", s),
-            BotError::Parse => write!(f, "Parse Error"),
+            BotError::Parse => write!(f, "Parsing Error"),
         }
     }
 }
