@@ -96,7 +96,7 @@ impl AoCSlackClient {
                             // If Solution thread initialization, post a first message in thread
                             if let Event::DailySolutionsThreadToInitialize(_day) = event {
                                 let thread_ts = res.ts;
-                                let message = format!("Show me your best move!");
+                                let message = format!(":warning: Last warning, spoiler ahead!");
                                 let first_thread_message = SlackApiChatPostMessageRequest::new(
                                     channel_id,
                                     SlackMessageContent::new().with_text(message),
