@@ -14,12 +14,10 @@ pub enum BotError {
     AOC(String),
     ChannelSend(String),
     Slack(String),
+    Compute(String),
     Parse,
 }
 
-// pub fn convert_err(e: reqwest::Error) -> std::io::Error {
-//     std::io::Error::new(std::io::ErrorKind::Other, e)
-// }
 pub fn convert_err(e: reqwest::Error) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::Other, e)
 }
@@ -34,6 +32,7 @@ impl fmt::Display for BotError {
             BotError::AOC(s) => write!(f, "AOC Error: {}", s),
             BotError::ChannelSend(s) => write!(f, "MPSC Error: {}", s),
             BotError::Slack(s) => write!(f, "Slack Communication Error: {}", s),
+            BotError::Compute(s) => write!(f, "Computation Error: {}", s),
             BotError::Parse => write!(f, "Parsing Error"),
         }
     }
@@ -46,12 +45,6 @@ impl From<reqwest::Error> for BotError {
         BotError::Http(error.to_string())
     }
 }
-
-// impl From<reqwest::Error> for std::io::Error {
-//     fn from(error: reqwest::Error) -> Self {
-//         std::io::Error::new(std::io::ErrorKind::Other, error)
-//     }
-// }
 
 impl From<std::io::Error> for BotError {
     fn from(error: std::io::Error) -> Self {
