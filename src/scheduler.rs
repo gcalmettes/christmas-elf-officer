@@ -197,8 +197,7 @@ async fn watch_global_leaderboard_job(
                 info!("Global Leaderboard for day {day} not complete yet.");
                 match aoc_client.global_leaderboard(year, day).await {
                     Ok(global_leaderboard) => {
-                        // 100 entries for each part, so completion is 2*100
-                        global_leaderboard_is_complete = global_leaderboard.is_count_equal_to(200);
+                        global_leaderboard_is_complete = global_leaderboard.is_global_complete();
 
                         // Scoped to not held data across .await
                         let hero_hits = {
@@ -232,19 +231,25 @@ async fn watch_global_leaderboard_job(
 
                         if global_leaderboard_is_complete {
                             info!("Global Leaderboard for day {day} is complete!");
-
-                            if let Err(e) = sender
-                                .send(Event::GlobalLeaderboardComplete((
-                                    day,
-                                    global_leaderboard.statistics(year, day),
-                                )))
-                                .await
-                            {
-                                let error = BotError::ChannelSend(format!(
-                                    "Could not send message to MPSC channel. {e}"
-                                ));
-                                error!("{error}");
-                            };
+                            match global_leaderboard.leaderboard.daily_statistics(year, day) {
+                                Ok(stats) => {
+                                    if let Err(e) = sender
+                                        .send(Event::GlobalLeaderboardComplete((day, stats)))
+                                        .await
+                                    {
+                                        let error = BotError::ChannelSend(format!(
+                                            "Could not send message to MPSC channel. {e}"
+                                        ));
+                                        error!("{error}");
+                                    };
+                                }
+                                Err(e) => {
+                                    let error = BotError::Compute(format!(
+                                        "Could not compute global statistics. {e}"
+                                    ));
+                                    error!("{error}");
+                                }
+                            }
                         }
                     }
                     Err(e) => {

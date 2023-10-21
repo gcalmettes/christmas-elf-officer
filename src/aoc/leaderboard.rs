@@ -9,6 +9,9 @@ use std::fmt;
 use std::iter::Iterator;
 use std::ops::{Deref, DerefMut};
 
+static AOC_PUZZLE_UTC_STARTING_HOUR: u32 = 5;
+static AOC_MONTH: u32 = 12;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
 pub enum ProblemPart {
     FIRST,
@@ -17,13 +20,13 @@ pub enum ProblemPart {
 
 #[derive(Debug)]
 pub struct LeaderboardStatistics {
-    pub p1_time_fast: Option<Duration>,
-    pub p1_time_slow: Option<Duration>,
-    pub p2_time_fast: Option<Duration>,
-    pub p2_time_slow: Option<Duration>,
-    // We also retrieve final rank (part 2) in addition of delta time
-    pub delta_fast: Option<(Duration, u8)>,
-    pub delta_slow: Option<(Duration, u8)>,
+    pub p1_fast: Option<Duration>,
+    pub p1_slow: Option<Duration>,
+    pub p2_fast: Option<Duration>,
+    pub p2_slow: Option<Duration>,
+    // (Delta,final rank (part 2))
+    pub delta_fast: Option<(Duration, Option<u8>)>,
+    pub delta_slow: Option<(Duration, Option<u8>)>,
 }
 
 // Puzzle completion events parsed from AoC API.
@@ -140,7 +143,12 @@ impl Solution {
                         NaiveDateTime::parse_from_str(&with_year, "%Y %b %d  %H:%M:%S").ok();
                     naive_datetime
                 })
-                .map(|d| DateTime::<Utc>::from_utc(d, Utc) + Duration::hours(6))
+                .map(|d| {
+                    // Global leaderboard entries are starting at 00:00:00, so we need to offset by
+                    // 5 hours to get real UTC time.
+                    DateTime::<Utc>::from_utc(d, Utc)
+                        + Duration::hours(AOC_PUZZLE_UTC_STARTING_HOUR.into())
+                })
                 .last(),
             None => None,
         };
@@ -168,9 +176,16 @@ impl Solution {
 
     pub fn puzzle_unlock(year: i32, day: u8) -> BotResult<DateTime<Utc>> {
         // Problems are released at 05:00:00 UTC
-        Utc.with_ymd_and_hms(year, 12, day.into(), 5, 0, 0)
-            .single()
-            .ok_or(BotError::Parse)
+        Utc.with_ymd_and_hms(
+            year,
+            AOC_MONTH,
+            day.into(),
+            AOC_PUZZLE_UTC_STARTING_HOUR,
+            0,
+            0,
+        )
+        .single()
+        .ok_or(BotError::Parse)
     }
 
     pub fn duration_from_release(&self) -> BotResult<Duration> {
@@ -347,7 +362,7 @@ impl Leaderboard {
             .collect::<HashMap<ProblemPart, (DateTime<Utc>, DateTime<Utc>)>>()
     }
 
-    pub fn standings_by_delta_for_day(
+    pub fn standings_by_delta_for_year_day(
         &self,
         year: i32,
         day: u8,
@@ -358,7 +373,7 @@ impl Leaderboard {
             .compute_min_max_times_for_year_day(year, day)
             .get(&ProblemPart::FIRST)
             .and_then(|(_p1_fast, p1_slow)| Some(*p1_slow))
-            .ok_or(BotError::AOC(
+            .ok_or(BotError::Compute(
                 "MinMax times could not be computed".to_string(),
             ))?;
 
@@ -399,6 +414,41 @@ impl Leaderboard {
             .collect::<Vec<(String, Duration, Option<u8>)>>();
         Ok(standings)
     }
+
+    pub fn daily_statistics(&self, year: i32, day: u8) -> BotResult<LeaderboardStatistics> {
+        let minmax_by_part = self.compute_min_max_times_for_year_day(year, day);
+        let (p1_fast, p1_slow) =
+            minmax_by_part
+                .get(&ProblemPart::FIRST)
+                .ok_or(BotError::Compute(
+                    "Could not retrieve minmax for part 1".to_string(),
+                ))?;
+        let (p2_fast, p2_slow) =
+            minmax_by_part
+                .get(&ProblemPart::SECOND)
+                .ok_or(BotError::Compute(
+                    "Could not retrieve minmax for part 2".to_string(),
+                ))?;
+
+        let sorted_deltas = self.standings_by_delta_for_year_day(year, day)?;
+        let mut sorted_deltas_iter = sorted_deltas.iter();
+
+        let challenge_start_time = Solution::puzzle_unlock(year, day)?;
+
+        let stats = LeaderboardStatistics {
+            p1_fast: Some(*p1_fast - challenge_start_time),
+            p1_slow: Some(*p1_slow - challenge_start_time),
+            p2_fast: Some(*p2_fast - challenge_start_time),
+            p2_slow: Some(*p2_slow - challenge_start_time),
+            delta_fast: sorted_deltas_iter
+                .next()
+                .and_then(|(_name, duration, rank)| Some((*duration, *rank))),
+            delta_slow: sorted_deltas_iter
+                .last()
+                .and_then(|(_name, duration, rank)| Some((*duration, *rank))),
+        };
+        Ok(stats)
+    }
 }
 
 impl Deref for Leaderboard {
@@ -423,116 +473,13 @@ impl ScrapedLeaderboard {
         }
     }
 
-    pub fn is_count_equal_to(&self, n: usize) -> bool {
+    fn is_count_equal_to(&self, n: usize) -> bool {
         self.leaderboard.len() == n
     }
 
-    pub fn statistics(&self, year: i32, day: u8) -> BotResult<LeaderboardStatistics> {
-        // Separate entries into part1/part2
-        let data = self
-            .leaderboard
-            .iter()
-            .filter(|e| e.year == year && e.day == day)
-            .into_group_map_by(|entry| entry.part);
-
-        // Make sure it's chronologically ordered.
-        let mut part_1 = data.get(&ProblemPart::FIRST).unwrap().clone();
-        let mut part_2 = data.get(&ProblemPart::SECOND).unwrap().clone();
-        part_1.sort_by_key(|e| e.timestamp);
-        part_2.sort_by_key(|e| e.timestamp);
-
-        // Prepare iterators to retrieve values.
-        let mut part_1 = part_1.iter();
-        let mut part_2 = part_2.iter();
-
-        let challenge_start_time = Solution::puzzle_unlock(year, day)?;
-
-        // Needed for computation of deltas for members who only scored one part of the global
-        // leaderboard that day.
-        let (max_time_for_first_part, max_time_for_second_part) = self.leaderboard.iter().fold(
-            (DateTime::<Utc>::MIN_UTC, DateTime::<Utc>::MIN_UTC),
-            |mut acc, entry| match entry.part {
-                ProblemPart::FIRST => {
-                    if entry.timestamp > acc.0 {
-                        acc.0 = entry.timestamp
-                    };
-                    acc
-                }
-                ProblemPart::SECOND => {
-                    if entry.timestamp > acc.1 {
-                        acc.1 = entry.timestamp
-                    };
-                    acc
-                }
-            },
-        );
-
-        // Compute deltas
-        let by_id = self
-            .leaderboard
-            .iter()
-            .filter(|e| e.rank.is_some())
-            .into_group_map_by(|e| e.id.numeric);
-
-        let mut sorted_deltas = by_id
-            .into_iter()
-            .map(|(_id, entries)| {
-                match entries.len() {
-                    1 => {
-                        // unwrap is safe as len == 1
-                        let entry = entries.last().unwrap();
-                        match entry.part {
-                            ProblemPart::FIRST => {
-                                // Scored only first part, second part overtime.
-                                // Duration is > (max second part - part.1), so we'll add 1 to the
-                                // diff as we have no way to know exactly
-                                (
-                                    max_time_for_second_part - entry.timestamp
-                                        + Duration::seconds(1),
-                                    101,
-                                )
-                            }
-                            ProblemPart::SECOND => {
-                                // Overtimed on first part, but came back strong to score second part
-                                // Duration is > (part.1, - max first part). We'll substract 1 sec.
-                                (
-                                    entry.timestamp
-                                        - max_time_for_first_part
-                                        - Duration::seconds(1),
-                                    entry.rank.unwrap(),
-                                )
-                            }
-                        }
-                    }
-                    2 => {
-                        let mut sorted = entries.into_iter().sorted_by_key(|e| e.timestamp);
-                        // unwrap are safe as len == 2
-                        let (p1, p2) = (sorted.next().unwrap(), sorted.next().unwrap());
-                        (p2.timestamp - p1.timestamp, p2.rank.unwrap())
-                    }
-                    _ => unreachable!(),
-                }
-            })
-            .filter(|(_duration, rank)| rank <= &100)
-            .sorted();
-
-        let statistics = LeaderboardStatistics {
-            p1_time_fast: part_1
-                .next()
-                .and_then(|e| Some(e.timestamp - challenge_start_time)),
-            p1_time_slow: part_1
-                .last()
-                .and_then(|e| Some(e.timestamp - challenge_start_time)),
-            p2_time_fast: part_2
-                .next()
-                .and_then(|e| Some(e.timestamp - challenge_start_time)),
-            p2_time_slow: part_2
-                .last()
-                .and_then(|e| Some(e.timestamp - challenge_start_time)),
-            delta_fast: sorted_deltas.next(),
-            delta_slow: sorted_deltas.last(),
-        };
-        Ok(statistics)
+    pub fn is_global_complete(&self) -> bool {
+        // 100 entries for each part, so completion is 2*100
+        self.is_count_equal_to(200)
     }
 
     pub fn check_for_private_members(

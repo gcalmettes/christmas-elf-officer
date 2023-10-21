@@ -88,12 +88,18 @@ impl fmt::Display for Event {
                         MessageTemplate::GlobalStatistics.get()
                         .render(context! {
                             day => day,
-                            p1_fast => statistics.p1_time_fast.map_or("N/A".to_string(), |d| format_duration(d)),
-                            p1_slow => statistics.p1_time_slow.map_or("N/A".to_string(), |d| format_duration(d)),
-                            p2_fast => statistics.p2_time_fast.map_or("N/A".to_string(), |d| format_duration(d)),
-                            p2_slow => statistics.p2_time_slow.map_or("N/A".to_string(), |d| format_duration(d)),
-                            delta_fast => statistics.delta_fast.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, ordinal_number_suffix(rank))),
-                            delta_slow => statistics.delta_slow.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, ordinal_number_suffix(rank))),
+                            p1_fast => statistics.p1_fast.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p1_slow => statistics.p1_slow.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p2_fast => statistics.p2_fast.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p2_slow => statistics.p2_slow.map_or("N/A".to_string(), |d| format_duration(d)),
+                            delta_fast => statistics.delta_fast.map_or("N/A".to_string(), |(d, rank)| {
+                                let rank = rank.unwrap_or_default();
+                                format!("*{}* ({}{})", format_duration(d), rank, ordinal_number_suffix(rank))
+                            }),
+                            delta_slow => statistics.delta_slow.map_or("N/A".to_string(), |(d, rank)| {
+                                let rank = rank.unwrap_or_default();
+                                format!("*{}* ({}{})", format_duration(d), rank, ordinal_number_suffix(rank))
+                            }),
                         })
                         .unwrap()
                 )
