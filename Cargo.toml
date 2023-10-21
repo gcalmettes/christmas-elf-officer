@@ -24,8 +24,8 @@ chrono = "0.4.26"
 ##################################
 # to be removed
 cron = "0.12.0"
-figment = { version = "0.10.11", features = ["env", "yaml"] }
 ##################################
+figment = { version = "0.10.11", features = ["env", "yaml"] }
 futures = "0.3.28"
 http = "0.2.9"
 itertools = "0.11.0"
@@ -39,7 +39,6 @@ slack-morphism = { version = "1.14.3", features = ["hyper"] }
 strum = { version = "0.25.0", features = ["derive"] }
 tokio = { version = "1.32.0", features = ["macros", "rt-multi-thread"] }
 tokio-cron-scheduler = "0.9.4"
-# tokio-stream = "0.1.14"
 tokio-util = { version = "0.7.8", features = ["io"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.17", features = ["env-filter"] }
