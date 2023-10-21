@@ -1,6 +1,6 @@
 use crate::aoc::leaderboard::{LeaderboardStatistics, ScrapedLeaderboard};
 use crate::messaging::templates::MessageTemplate;
-use crate::utils::{format_duration, suffix};
+use crate::utils::{format_duration, ordinal_number_suffix};
 use minijinja::context;
 use std::fmt;
 use std::iter::Iterator;
@@ -92,8 +92,8 @@ impl fmt::Display for Event {
                             p1_slow => statistics.p1_time_slow.map_or("N/A".to_string(), |d| format_duration(d)),
                             p2_fast => statistics.p2_time_fast.map_or("N/A".to_string(), |d| format_duration(d)),
                             p2_slow => statistics.p2_time_slow.map_or("N/A".to_string(), |d| format_duration(d)),
-                            delta_fast => statistics.delta_fast.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, suffix(rank))),
-                            delta_slow => statistics.delta_slow.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, suffix(rank))),
+                            delta_fast => statistics.delta_fast.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, ordinal_number_suffix(rank))),
+                            delta_slow => statistics.delta_slow.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, ordinal_number_suffix(rank))),
                         })
                         .unwrap()
                 )
