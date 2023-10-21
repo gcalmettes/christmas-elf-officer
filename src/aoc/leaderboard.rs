@@ -199,6 +199,15 @@ impl Leaderboard {
         Leaderboard(SolutionVec::new())
     }
 
+    fn is_entry_count_equal_to(&self, n: usize) -> bool {
+        self.len() == n
+    }
+
+    pub fn is_global_complete(&self) -> bool {
+        // 100 entries for each part, so completion of global leaderboard is 2*100
+        self.is_entry_count_equal_to(200)
+    }
+
     /// Members => (unordered) stars
     fn solutions_per_member(&self) -> HashMap<&Identifier, Vec<&Solution>> {
         self.iter().into_group_map_by(|a| &a.id)
@@ -449,6 +458,28 @@ impl Leaderboard {
         };
         Ok(stats)
     }
+
+    pub fn look_for_other_leaderboard_members(
+        &self,
+        other_leaderboard: &Leaderboard,
+    ) -> Vec<(Identifier, ProblemPart)> {
+        let other_members_ids = other_leaderboard.members_ids();
+        let heroes = self
+            .iter()
+            .filter(|entry| other_members_ids.contains(&entry.id.numeric))
+            .map(|entry| {
+                (
+                    other_leaderboard
+                        .get_member_by_id(entry.id.numeric)
+                        // we can safely unwrap as if it enters the map there is a match
+                        .unwrap()
+                        .clone(),
+                    entry.part,
+                )
+            })
+            .collect::<Vec<(Identifier, ProblemPart)>>();
+        heroes
+    }
 }
 
 impl Deref for Leaderboard {
@@ -471,37 +502,5 @@ impl ScrapedLeaderboard {
             timestamp: Utc::now(),
             leaderboard: Leaderboard::new(),
         }
-    }
-
-    fn is_count_equal_to(&self, n: usize) -> bool {
-        self.leaderboard.len() == n
-    }
-
-    pub fn is_global_complete(&self) -> bool {
-        // 100 entries for each part, so completion is 2*100
-        self.is_count_equal_to(200)
-    }
-
-    pub fn check_for_private_members(
-        &self,
-        private_leaderboard: &Leaderboard,
-    ) -> Vec<(Identifier, ProblemPart)> {
-        let private_members_ids = private_leaderboard.members_ids();
-        let heroes = self
-            .leaderboard
-            .iter()
-            .filter(|entry| private_members_ids.contains(&entry.id.numeric))
-            .map(|entry| {
-                (
-                    private_leaderboard
-                        .get_member_by_id(entry.id.numeric)
-                        // we can safely unwrap as if it enters the map there is a match
-                        .unwrap()
-                        .clone(),
-                    entry.part,
-                )
-            })
-            .collect::<Vec<(Identifier, ProblemPart)>>();
-        heroes
     }
 }

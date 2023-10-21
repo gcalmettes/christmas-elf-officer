@@ -191,20 +191,24 @@ async fn watch_global_leaderboard_job(
             let mut known_hero_hits: Vec<(Identifier, ProblemPart)> = vec![];
 
             info!("Starting polling Global Leaderboard for day {day}.");
-            let mut global_leaderboard_is_complete = false;
+            let mut is_global_leaderboard_complete = false;
 
-            while !global_leaderboard_is_complete {
+            while !is_global_leaderboard_complete {
                 info!("Global Leaderboard for day {day} not complete yet.");
                 match aoc_client.global_leaderboard(year, day).await {
                     Ok(global_leaderboard) => {
-                        global_leaderboard_is_complete = global_leaderboard.is_global_complete();
+                        is_global_leaderboard_complete =
+                            global_leaderboard.leaderboard.is_global_complete();
 
                         // Scoped to not held data across .await
                         let hero_hits = {
                             // check if private members made it to the global leaderboard
                             let private_leaderboard = cache.data.lock().unwrap();
                             global_leaderboard
-                                .check_for_private_members(&private_leaderboard.leaderboard)
+                                .leaderboard
+                                .look_for_other_leaderboard_members(
+                                    &private_leaderboard.leaderboard,
+                                )
                         };
 
                         for hero_hit in hero_hits {
@@ -229,7 +233,7 @@ async fn watch_global_leaderboard_job(
                             }
                         }
 
-                        if global_leaderboard_is_complete {
+                        if is_global_leaderboard_complete {
                             info!("Global Leaderboard for day {day} is complete!");
                             match global_leaderboard.leaderboard.daily_statistics(year, day) {
                                 Ok(stats) => {
