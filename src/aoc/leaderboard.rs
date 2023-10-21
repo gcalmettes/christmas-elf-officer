@@ -1,7 +1,7 @@
-use crate::utils::challenge_release_time;
-use chrono::naive::NaiveDateTime;
-use chrono::{DateTime, Duration, Utc};
+use crate::error::{BotError, BotResult};
+use chrono::{naive::NaiveDateTime, DateTime, Duration, TimeZone, Utc};
 use itertools::Itertools;
+use itertools::MinMaxResult;
 use scraper::{Node, Selector};
 use std::cmp::Reverse;
 use std::collections::HashMap;
@@ -165,6 +165,18 @@ impl Solution {
             _ => None,
         }
     }
+
+    pub fn puzzle_unlock(year: i32, day: u8) -> BotResult<DateTime<Utc>> {
+        // Problems are released at 05:00:00 UTC
+        Utc.with_ymd_and_hms(year, 12, day.into(), 5, 0, 0)
+            .single()
+            .ok_or(BotError::Parse)
+    }
+
+    pub fn duration_from_release(&self) -> BotResult<Duration> {
+        let release_time = Solution::puzzle_unlock(self.year, self.day)?;
+        Ok(self.timestamp - release_time)
+    }
 }
 
 impl Leaderboard {
@@ -178,9 +190,13 @@ impl Leaderboard {
     }
 
     /// Idem, but for a specific day
-    fn solutions_per_member_for_day(&self, day: u8) -> HashMap<&Identifier, Vec<&Solution>> {
+    fn solutions_per_member_for_year_day(
+        &self,
+        year: i32,
+        day: u8,
+    ) -> HashMap<&Identifier, Vec<&Solution>> {
         self.iter()
-            .filter(|s| s.day == day)
+            .filter(|s| s.year == year && s.day == day)
             .into_group_map_by(|a| &a.id)
     }
 
@@ -229,12 +245,15 @@ impl Leaderboard {
         let standings_per_challenge = self.standings_per_challenge();
         standings_per_challenge
             .iter()
-            .fold(HashMap::new(), |mut acc, ((day, _), star_rank)| {
-                star_rank.iter().enumerate().for_each(|(rank, id)| {
-                    let star_score = n_members - rank;
-                    let day_scores = acc.entry(*id).or_insert([0; 25]);
-                    day_scores[(*day - 1) as usize] += star_score;
-                });
+            .fold(HashMap::new(), |mut acc, ((day, _part), star_rank)| {
+                star_rank
+                    .iter()
+                    .enumerate()
+                    .for_each(|(rank_minus_one, id)| {
+                        let star_score = n_members - rank_minus_one;
+                        let day_scores = acc.entry(*id).or_insert([0; 25]);
+                        day_scores[(*day - 1) as usize] += star_score;
+                    });
                 acc
             })
     }
@@ -246,7 +265,10 @@ impl Leaderboard {
             .collect()
     }
 
-    pub fn compute_diffs(&self, current_leaderboard: &Leaderboard) -> Vec<&Solution> {
+    pub fn compute_entries_differences_from(
+        &self,
+        current_leaderboard: &Leaderboard,
+    ) -> Vec<&Solution> {
         let current_solutions = current_leaderboard
             .iter()
             .map(|s| (s.id.numeric, s.day, s.part))
@@ -304,24 +326,78 @@ impl Leaderboard {
             .collect::<Vec<(String, usize)>>()
     }
 
-    // ranking by time between part 1 and part 2 completions
-    pub fn standings_by_delta_for_day(&self, day: u8) -> Vec<(String, Duration)> {
-        self.solutions_per_member_for_day(day)
+    fn compute_min_max_times_for_year_day(
+        &self,
+        year: i32,
+        day: u8,
+    ) -> HashMap<ProblemPart, (DateTime<Utc>, DateTime<Utc>)> {
+        // Compute max time for each part, in order to infer deltas for members who only scored
+        // one part of the global leaderboard that day.
+        self.iter()
+            .filter(|s| s.year == year && s.day == day)
+            .into_group_map_by(|s| s.part)
+            .iter()
+            .map(
+                |(p, solutions)| match solutions.iter().minmax_by_key(|s| s.timestamp) {
+                    MinMaxResult::OneElement(s) => (*p, (s.timestamp, s.timestamp)),
+                    MinMaxResult::MinMax(s1, s2) => (*p, (s1.timestamp, s2.timestamp)),
+                    MinMaxResult::NoElements => unreachable!(),
+                },
+            )
+            .collect::<HashMap<ProblemPart, (DateTime<Utc>, DateTime<Utc>)>>()
+    }
+
+    pub fn standings_by_delta_for_day(
+        &self,
+        year: i32,
+        day: u8,
+    ) -> BotResult<Vec<(String, Duration, Option<u8>)>> {
+        // We will use max time of part 1 to infer deltas for members who only scored
+        // the second part on that day.
+        let max_time_first_part = self
+            .compute_min_max_times_for_year_day(year, day)
+            .get(&ProblemPart::FIRST)
+            .and_then(|(_p1_fast, p1_slow)| Some(*p1_slow))
+            .ok_or(BotError::AOC(
+                "MinMax times could not be computed".to_string(),
+            ))?;
+
+        let standings = self
+            .solutions_per_member_for_year_day(year, day)
             .into_iter()
             .filter_map(|(id, solutions_for_day)| match solutions_for_day.len() {
-                0 | 1 => None,
+                1 => {
+                    // unwrap is safe as len == 1
+                    let entry = solutions_for_day.last().unwrap();
+                    match entry.part {
+                        ProblemPart::FIRST => None,
+                        ProblemPart::SECOND => {
+                            // Overtimed on first part, but came back strong to score second part
+                            // Duration is > (part.1, - max first part). We'll substract 1 sec.
+                            Some((
+                                id.name.clone(),
+                                entry.timestamp - max_time_first_part - Duration::seconds(1),
+                                entry.rank,
+                            ))
+                        }
+                    }
+                }
                 2 => {
-                    let mut ordered_parts = solutions_for_day
-                        .iter()
-                        .sorted_by_key(|s| s.timestamp)
-                        .tuples();
-                    let (first, second) = ordered_parts.next().unwrap();
-                    Some((id.name.clone(), second.timestamp - first.timestamp))
+                    let mut ordered_parts = solutions_for_day.iter().sorted_by_key(|s| s.timestamp);
+                    // safe unwrap since len == 2
+                    let (first, second) =
+                        (ordered_parts.next().unwrap(), ordered_parts.next().unwrap());
+                    Some((
+                        id.name.clone(),
+                        second.timestamp - first.timestamp,
+                        second.rank,
+                    ))
                 }
                 _ => unreachable!(),
             })
             .sorted_by_key(|r| r.1)
-            .collect::<Vec<(String, Duration)>>()
+            .collect::<Vec<(String, Duration, Option<u8>)>>();
+        Ok(standings)
     }
 }
 
@@ -351,7 +427,7 @@ impl ScrapedLeaderboard {
         self.leaderboard.len() == n
     }
 
-    pub fn statistics(&self, year: i32, day: u8) -> LeaderboardStatistics {
+    pub fn statistics(&self, year: i32, day: u8) -> BotResult<LeaderboardStatistics> {
         // Separate entries into part1/part2
         let data = self
             .leaderboard
@@ -369,7 +445,7 @@ impl ScrapedLeaderboard {
         let mut part_1 = part_1.iter();
         let mut part_2 = part_2.iter();
 
-        let challenge_start_time = challenge_release_time(year, day);
+        let challenge_start_time = Solution::puzzle_unlock(year, day)?;
 
         // Needed for computation of deltas for members who only scored one part of the global
         // leaderboard that day.
@@ -456,7 +532,7 @@ impl ScrapedLeaderboard {
             delta_fast: sorted_deltas.next(),
             delta_slow: sorted_deltas.last(),
         };
-        statistics
+        Ok(statistics)
     }
 
     pub fn check_for_private_members(
