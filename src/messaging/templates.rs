@@ -63,7 +63,9 @@ impl MessageTemplate {
                 "
             },
             MessageTemplate::DailySolutionThread => {
-                ":point_down: Daily solution thread for *day {{day}}*"
+                ":point_down: *Daily discussion thread for day {{day}}*\n\
+                    \x20   Refrain yourself to open until you complete part 2!\n\
+                 :rotating_light: *Spoilers Ahead* :rotating_light:"
             },
             MessageTemplate::PrivateLeaderboardUpdated => {
                 ":repeat: Private Leaderboard successfully updated!"
