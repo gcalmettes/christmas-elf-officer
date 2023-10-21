@@ -168,7 +168,7 @@ async fn watch_global_leaderboard_job(
     cache: MemoryCache,
     sender: Arc<Sender<Event>>,
 ) -> BotResult<Job> {
-    let job = Job::new_async(schedule, move |uuid, mut l| {
+    let job = Job::new_async(schedule, move |_uuid, _l| {
         let cache = cache.clone();
         let sender = sender.clone();
 
@@ -234,7 +234,7 @@ async fn watch_global_leaderboard_job(
                         }
 
                         if is_global_leaderboard_complete {
-                            info!("Global Leaderboard for day {day} is complete!");
+                            info!("Global Leaderboard for day {day} is now complete!");
                             match global_leaderboard.leaderboard.daily_statistics(year, day) {
                                 Ok(stats) => {
                                     if let Err(e) = sender
@@ -271,7 +271,7 @@ async fn watch_global_leaderboard_job(
 }
 
 async fn parse_daily_challenge_job(schedule: &str, sender: Arc<Sender<Event>>) -> BotResult<Job> {
-    let job = Job::new_async(schedule, move |uuid, mut l| {
+    let job = Job::new_async(schedule, move |_uuid, _l| {
         let sender = sender.clone();
         Box::pin(async move {
             let aoc_client = AoC::new();
