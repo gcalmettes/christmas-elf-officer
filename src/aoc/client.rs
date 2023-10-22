@@ -1,6 +1,6 @@
 use chrono::{TimeZone, Utc};
 use reqwest::{Client, StatusCode};
-use scraper::{Html, Node, Selector};
+use scraper::{Html, Selector};
 use std::fmt;
 
 use std::collections::HashMap;

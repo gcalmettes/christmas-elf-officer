@@ -188,7 +188,7 @@ impl Solution {
         .ok_or(BotError::Parse)
     }
 
-    pub fn duration_from_release(&self) -> BotResult<Duration> {
+    pub fn duration_since_release(&self) -> BotResult<Duration> {
         let release_time = Solution::puzzle_unlock(self.year, self.day)?;
         Ok(self.timestamp - release_time)
     }
@@ -292,14 +292,19 @@ impl Leaderboard {
     pub fn compute_entries_differences_from(
         &self,
         current_leaderboard: &Leaderboard,
-    ) -> Vec<&Solution> {
+    ) -> Vec<Solution> {
         let current_solutions = current_leaderboard
             .iter()
             .map(|s| (s.id.numeric, s.day, s.part))
             .collect::<Vec<(u64, u8, ProblemPart)>>();
 
         self.iter()
-            .filter(|s| !current_solutions.contains(&(s.id.numeric, s.day, s.part)))
+            .filter_map(
+                |s| match !current_solutions.contains(&(s.id.numeric, s.day, s.part)) {
+                    true => Some(s.clone()),
+                    false => None,
+                },
+            )
             .collect()
     }
 
