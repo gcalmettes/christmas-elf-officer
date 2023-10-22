@@ -1,4 +1,5 @@
 use chrono::{Datelike, Utc};
+use itertools::Itertools;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::time;
@@ -134,11 +135,46 @@ async fn update_private_leaderboard_job(
             let aoc_client = AoC::new();
             match aoc_client.private_leaderboard(2022).await {
                 Ok(scraped_leaderboard) => {
-                    // Scoped to force 'data' to drop before 'await' so future can be Send
+                    // TODO: check for new members, and if so announce it.
+                    // Message could include something like "XX has joined the battle field! now every star provide x number of
+                    // points". No worries, changes have been automatically applied to past stars.
+
+                    // TODO: check for lost members, and if so announce it ?
+                    // Message could include something like "now every star provide x number of
+                    // points".
+
+                    let new_completions = {
+                        let current_leaderboard = cache.data.lock().unwrap();
+                        scraped_leaderboard
+                            .leaderboard
+                            .compute_entries_differences_from(&current_leaderboard.leaderboard)
+
+                        // TODO: here we also might need to compute/retrieve anything we need to
+                        // provide informative message in template
+                        // https://github.com/ey3ball/fieldbot-aoc/blob/master/lib/aoc/rank/stats.ex#L109
+                        // - number of points added (diff of daily_scores_per_member for target days)
+                        // - is it completion of that specific day ? and if so what is delta
+                    };
+
+                    if !new_completions.is_empty() {
+                        if let Err(e) = sender
+                            .send(Event::PrivateLeaderboardNewCompletions(new_completions))
+                            .await
+                        {
+                            let error = BotError::ChannelSend(format!(
+                                "Could not send message to MPSC channel. {e}"
+                            ));
+                            error!("{error}");
+                        };
+                    }
+
+                    // Save new leadearboard in cache.
+                    // Scoped to force 'data' to drop before 'await' so future can be Send.
                     {
                         let mut data = cache.data.lock().unwrap();
                         *data = scraped_leaderboard;
                     }
+
                     if let Err(e) = sender.send(Event::PrivateLeaderboardUpdated).await {
                         let error = BotError::ChannelSend(format!(
                             "Could not send message to MPSC channel. {e}"

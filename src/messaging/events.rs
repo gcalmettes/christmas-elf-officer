@@ -1,6 +1,7 @@
-use crate::aoc::leaderboard::{LeaderboardStatistics, ScrapedLeaderboard};
+use crate::aoc::leaderboard::{LeaderboardStatistics, ScrapedLeaderboard, Solution};
 use crate::messaging::templates::MessageTemplate;
-use crate::utils::{format_duration, ordinal_number_suffix};
+use crate::utils::{categorize_leaderboard_entries, format_duration, ordinal_number_suffix};
+use itertools::Itertools;
 use minijinja::context;
 use std::fmt;
 use std::iter::Iterator;
@@ -16,6 +17,7 @@ pub enum Event {
     GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
     GlobalLeaderboardHeroFound((String, String)),
     DailyChallengeIsUp(String),
+    PrivateLeaderboardNewCompletions(Vec<Solution>),
     PrivateLeaderboardUpdated,
     DailySolutionsThreadToInitialize(u32),
     CommandReceived(SlackChannelId, SlackTs, Command),
@@ -124,7 +126,34 @@ impl fmt::Display for Event {
                         .unwrap()
                 )
             }
-            Event::CommandReceived(_channel_id, ts, cmd) => match cmd {
+
+            Event::PrivateLeaderboardNewCompletions(completions) => {
+                // TODO: get day programmatically
+                let today: u8 = 9;
+                let (today_completions, late_completions) =
+                    categorize_leaderboard_entries(completions, today);
+
+                let mut output = String::new();
+                if let Some(today_completions) = today_completions {
+                    output.push_str(
+                        &MessageTemplate::NewTodayCompletions
+                            .get()
+                            .render(context! {completions => today_completions})
+                            .unwrap(),
+                    );
+                };
+                if let Some(late_completions) = late_completions {
+                    output.push_str(
+                        &MessageTemplate::NewLateCompletions
+                            .get()
+                            .render(context! {completions => late_completions})
+                            .unwrap(),
+                    );
+                };
+
+                write!(f, "{}", output)
+            }
+            Event::CommandReceived(_channel_id, _ts, cmd) => match cmd {
                 Command::Help => {
                     write!(f, "{}", MessageTemplate::Help.get().render({}).unwrap())
                 }

@@ -26,6 +26,8 @@ pub enum MessageTemplate {
     DailySolutionThread,
     GlobalStatistics,
     PrivateLeaderboardUpdated,
+    NewTodayCompletions,
+    NewLateCompletions,
     Ranking,
     Hero,
 }
@@ -37,6 +39,8 @@ impl MessageTemplate {
             MessageTemplate::DailyChallenge => "challenge.txt",
             MessageTemplate::DailySolutionThread => "solution_thread.txt",
             MessageTemplate::PrivateLeaderboardUpdated => "private_leaderboard_updated.txt",
+            MessageTemplate::NewTodayCompletions => "today_completions.txt",
+            MessageTemplate::NewLateCompletions => "late_completions.txt",
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
             MessageTemplate::Ranking => "ranking.txt",
             MessageTemplate::Hero => "hero.txt",
@@ -69,6 +73,16 @@ impl MessageTemplate {
             },
             MessageTemplate::PrivateLeaderboardUpdated => {
                 ":repeat: Private Leaderboard successfully updated!"
+            },
+            MessageTemplate::NewTodayCompletions => {
+                "{%- for (name, entry) in completions %}\n\
+                    {% with two = entry.parts_duration|length > 1, both = entry.part == '2', double =  ':white_check_mark:', single = ':heavy_check_mark:' %}\
+                    :mega:  {{name}} just earned {{ '*2*' if two else '*1*' }} more star{{ 's' if two }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }})
+                    {%- endwith %}
+                 {%- endfor %}"
+            },
+            MessageTemplate::NewLateCompletions => {
+                "NEW LATE COMPLETION"
             },
             MessageTemplate::GlobalStatistics => {
                 ":tada: Global Leaderboard complete for *day {{day}}*, here is how it went for the big dogs:\n\

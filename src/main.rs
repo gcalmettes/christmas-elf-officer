@@ -1,7 +1,7 @@
 use chrono::{Timelike, Utc};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::{info, Level};
+use tracing::info;
 
 use messaging::client::AoCSlackClient;
 use messaging::events::Event;
@@ -27,6 +27,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     tracing::subscriber::set_global_default(subscriber).expect("Setting default subscriber failed");
 
+    // Silencing the warning, as removing the mut here would actually break compilation.
+    #[allow(unused_mut)]
     // Capacity of 64 should be more than plenty to handle all the messages
     let (tx, mut rx) = mpsc::channel::<Event>(64);
 
@@ -37,7 +39,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let now_second = now.second();
 
     // At every 15th minute from (now_minute % 15) through 59.
-    let private_leaderboard_schedule = format!("{} {}/15 * 1-25 12 *", now_second, now_minute % 15);
+    let _private_leaderboard_schedule =
+        format!("{} {}/15 * 1-25 12 *", now_second, now_minute % 15);
 
     // Initialize global cache
     let cache = MemoryCache::new();
@@ -47,10 +50,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let jobs = vec![
         JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
         // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
-        JobProcess::UpdatePrivateLeaderboard("1/8 * * * * *"),
+        JobProcess::UpdatePrivateLeaderboard("1/10 * * * * *"),
         // JobProcess::InitializeDailySolutionsThread("1/15 * * * * *"),
         // JobProcess::WatchGlobalLeaderboard("1/30 * * * * *"),
-        JobProcess::ParseDailyChallenge("1/20 * * * * *"),
+        // JobProcess::ParseDailyChallenge("1/20 * * * * *"),
     ];
     for job in jobs {
         sched.add_job(job).await?;
