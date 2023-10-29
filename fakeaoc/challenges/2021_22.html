@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+<meta charset="utf-8"/>
+<title>Day 22 - Advent of Code 2021</title>
+<link rel="stylesheet" type="text/css" href="/static/style.css?31"/>
+<link rel="stylesheet alternate" type="text/css" href="/static/highcontrast.css?1" title="High Contrast"/>
+<link rel="shortcut icon" href="/favicon.png"/>
+<script>window.addEventListener('click', function(e,s,r){if(e.target.nodeName==='CODE'&&e.detail===3){s=window.getSelection();s.removeAllRanges();r=document.createRange();r.selectNodeContents(e.target);s.addRange(r);}});</script>
+</head><!--
+
+
+
+
+Oh, hello!  Funny seeing you here.
+
+I appreciate your enthusiasm, but you aren't going to find much down here.
+There certainly aren't clues to any of the puzzles.  The best surprises don't
+even appear in the source until you unlock them for real.
+
+Please be careful with automated requests; I'm not a massive company, and I can
+only take so much traffic.  Please be considerate so that everyone gets to play.
+
+If you're curious about how Advent of Code works, it's running on some custom
+Perl code. Other than a few integrations (auth, analytics, social media), I
+built the whole thing myself, including the design, animations, prose, and all
+of the puzzles.
+
+The puzzles are most of the work; preparing a new calendar and a new set of
+puzzles each year takes all of my free time for 4-5 months. A lot of effort
+went into building this thing - I hope you're enjoying playing it as much as I
+enjoyed making it for you!
+
+If you'd like to hang out, I'm @ericwastl@hachyderm.io on Mastodon and
+@ericwastl on Twitter.
+
+- Eric Wastl
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-->
+<body>
+<header><div><h1 class="title-global"><a href="/">Advent of Code</a></h1><nav><ul><li><a href="/2021/about">[About]</a></li><li><a href="/2021/events">[Events]</a></li><li><a href="https://teespring.com/stores/advent-of-code" target="_blank">[Shop]</a></li><li><a href="/2021/auth/login">[Log In]</a></li></ul></nav></div><div><h1 class="title-event">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="title-event-wrap">/*</span><a href="/2021">2021</a><span class="title-event-wrap">*/</span></h1><nav><ul><li><a href="/2021">[Calendar]</a></li><li><a href="/2021/support">[AoC++]</a></li><li><a href="/2021/sponsors">[Sponsors]</a></li><li><a href="/2021/leaderboard">[Leaderboard]</a></li><li><a href="/2021/stats">[Stats]</a></li></ul></nav></div></header>
+
+<div id="sidebar">
+<div id="sponsor"><div class="quiet">Our <a href="/2021/sponsors">sponsors</a> help make Advent of Code possible:</div><div class="sponsor"><a href="https://ahrefs.com/" target="_blank" onclick="if(ga)ga('send','event','sponsor','sidebar',this.href);" rel="noopener">Ahrefs</a> - Leverage modern hardware and advanced programming to process real big data. Work on the next general purpose search engine. From anywhere in the world. OCaml, Reasonml, C++</div></div>
+</div><!--/sidebar-->
+
+<main>
+<article class="day-desc"><h2>--- Day 22: Reactor Reboot ---</h2><p>Operating at these extreme ocean depths has overloaded the submarine's reactor; it needs to be rebooted.</p>
+<p>The reactor core is made up of a large 3-dimensional grid made up entirely of cubes, one cube per integer 3-dimensional coordinate (<code>x,y,z</code>). Each cube can be either <em>on</em> or <em>off</em>; at the start of the reboot process, they are all <em>off</em>. (Could it be an old model of a reactor you've seen <a href="/2020/day/17">before</a>?)</p>
+<p>To reboot the reactor, you just need to set all of the cubes to either <em>on</em> or <em>off</em> by following a list of <em>reboot steps</em> (your puzzle input). Each step specifies a <a href="https://en.wikipedia.org/wiki/Cuboid" target="_blank">cuboid</a> (the set of all cubes that have coordinates which fall within ranges for <code>x</code>, <code>y</code>, and <code>z</code>) and whether to turn all of the cubes in that cuboid <em>on</em> or <em>off</em>.</p>
+<p>For example, given these reboot steps:</p>
+<pre><code>on x=10..12,y=10..12,z=10..12
+on x=11..13,y=11..13,z=11..13
+off x=9..11,y=9..11,z=9..11
+on x=10..10,y=10..10,z=10..10
+</code></pre>
+<p>The first step (<code>on x=10..12,y=10..12,z=10..12</code>) turns <em>on</em> a 3x3x3 cuboid consisting of 27 cubes:</p>
+<ul>
+<li><code>10,10,10</code></li>
+<li><code>10,10,11</code></li>
+<li><code>10,10,12</code></li>
+<li><code>10,11,10</code></li>
+<li><code>10,11,11</code></li>
+<li><code>10,11,12</code></li>
+<li><code>10,12,10</code></li>
+<li><code>10,12,11</code></li>
+<li><code>10,12,12</code></li>
+<li><code>11,10,10</code></li>
+<li><code>11,10,11</code></li>
+<li><code>11,10,12</code></li>
+<li><code>11,11,10</code></li>
+<li><code>11,11,11</code></li>
+<li><code>11,11,12</code></li>
+<li><code>11,12,10</code></li>
+<li><code>11,12,11</code></li>
+<li><code>11,12,12</code></li>
+<li><code>12,10,10</code></li>
+<li><code>12,10,11</code></li>
+<li><code>12,10,12</code></li>
+<li><code>12,11,10</code></li>
+<li><code>12,11,11</code></li>
+<li><code>12,11,12</code></li>
+<li><code>12,12,10</code></li>
+<li><code>12,12,11</code></li>
+<li><code>12,12,12</code></li>
+</ul>
+<p>The second step (<code>on x=11..13,y=11..13,z=11..13</code>) turns <em>on</em> a 3x3x3 cuboid that overlaps with the first. As a result, only 19 additional cubes turn on; the rest are already on from the previous step:</p>
+<ul>
+<li><code>11,11,13</code></li>
+<li><code>11,12,13</code></li>
+<li><code>11,13,11</code></li>
+<li><code>11,13,12</code></li>
+<li><code>11,13,13</code></li>
+<li><code>12,11,13</code></li>
+<li><code>12,12,13</code></li>
+<li><code>12,13,11</code></li>
+<li><code>12,13,12</code></li>
+<li><code>12,13,13</code></li>
+<li><code>13,11,11</code></li>
+<li><code>13,11,12</code></li>
+<li><code>13,11,13</code></li>
+<li><code>13,12,11</code></li>
+<li><code>13,12,12</code></li>
+<li><code>13,12,13</code></li>
+<li><code>13,13,11</code></li>
+<li><code>13,13,12</code></li>
+<li><code>13,13,13</code></li>
+</ul>
+<p>The third step (<code>off x=9..11,y=9..11,z=9..11</code>) turns <em>off</em> a 3x3x3 cuboid that overlaps partially with some cubes that are on, ultimately turning off 8 cubes:</p>
+<ul>
+<li><code>10,10,10</code></li>
+<li><code>10,10,11</code></li>
+<li><code>10,11,10</code></li>
+<li><code>10,11,11</code></li>
+<li><code>11,10,10</code></li>
+<li><code>11,10,11</code></li>
+<li><code>11,11,10</code></li>
+<li><code>11,11,11</code></li>
+</ul>
+<p>The final step (<code>on x=10..10,y=10..10,z=10..10</code>) turns <em>on</em> a single cube, <code>10,10,10</code>. After this last step, <code><em>39</em></code> cubes are <em>on</em>.</p>
+<p>The initialization procedure only uses cubes that have <code>x</code>, <code>y</code>, and <code>z</code> positions of at least <code>-50</code> and at most <code>50</code>. For now, ignore cubes outside this region.</p>
+<p>Here is a larger example:</p>
+<pre><code>on x=-20..26,y=-36..17,z=-47..7
+on x=-20..33,y=-21..23,z=-26..28
+on x=-22..28,y=-29..23,z=-38..16
+on x=-46..7,y=-6..46,z=-50..-1
+on x=-49..1,y=-3..46,z=-24..28
+on x=2..47,y=-22..22,z=-23..27
+on x=-27..23,y=-28..26,z=-21..29
+on x=-39..5,y=-6..47,z=-3..44
+on x=-30..21,y=-8..43,z=-13..34
+on x=-22..26,y=-27..20,z=-29..19
+off x=-48..-32,y=26..41,z=-47..-37
+on x=-12..35,y=6..50,z=-50..-2
+off x=-48..-32,y=-32..-16,z=-15..-5
+on x=-18..26,y=-33..15,z=-7..46
+off x=-40..-22,y=-38..-28,z=23..41
+on x=-16..35,y=-41..10,z=-47..6
+off x=-32..-23,y=11..30,z=-14..3
+on x=-49..-5,y=-3..45,z=-29..18
+off x=18..30,y=-20..-8,z=-3..13
+on x=-41..9,y=-7..43,z=-33..15
+on x=-54112..-39298,y=-85059..-49293,z=-27449..7877
+on x=967..23432,y=45373..81175,z=27513..53682
+</code></pre>
+<p>The last two steps are fully outside the initialization procedure area; all other steps are fully within it. After executing these steps in the initialization procedure region, <code><em>590784</em></code> cubes are <em>on</em>.</p>
+<p>Execute the reboot steps. Afterward, considering only cubes in the region <code>x=-50..50,y=-50..50,z=-50..50</code>, <em>how many cubes are on?</em></p>
+</article>
+<p>To play, please identify yourself via one of these services:</p>
+<p><a href="/auth/github">[GitHub]</a> <a href="/auth/google">[Google]</a> <a href="/auth/twitter">[Twitter]</a> <a href="/auth/reddit">[Reddit]</a> <span class="quiet">- <a href="/about#faq_auth">[How Does Auth Work?]</a></span></p>
+</main>
+
+<!-- ga -->
+<script>
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-69522494-1', 'auto');
+ga('set', 'anonymizeIp', true);
+ga('send', 'pageview');
+</script>
+<!-- /ga -->
+</body>
+</html>
