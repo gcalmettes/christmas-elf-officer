@@ -75,14 +75,19 @@ impl MessageTemplate {
                 ":repeat: Private Leaderboard successfully updated!"
             },
             MessageTemplate::NewTodayCompletions => {
-                "{%- for (name, entry) in completions %}\n\
-                    {% with two = entry.parts_duration|length > 1, both = entry.part == '2', double =  ':white_check_mark:', single = ':heavy_check_mark:' %}\
-                    :mega:  {{name}} just earned {{ '*2*' if two else '*1*' }} more star{{ 's' if two }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }})
+                "{%- for entry in completions %}\n\
+                    {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
+                    :mega:  {{entry.name}} just earned *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} {{ ['(day', entry.day, double, 'completed!)']|join(' ')  if both else ['for day', entry.day, single]|join(' ') }} +{{entry.new_points}}pts
                     {%- endwith %}
                  {%- endfor %}"
             },
             MessageTemplate::NewLateCompletions => {
-                "NEW LATE COMPLETION"
+                "Catching up on some past days:\n\
+                {%- for entry in completions %}\n\
+                    {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
+                    :mega:  {{entry.name}} just earned *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }}) +{{entry.new_points}}pts
+                    {%- endwith %}
+                 {%- endfor %}"
             },
             MessageTemplate::GlobalStatistics => {
                 ":tada: Global Leaderboard complete for *day {{day}}*, here is how it went for the big dogs:\n\

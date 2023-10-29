@@ -14,6 +14,7 @@ use crate::config;
 use crate::error::{BotError, BotResult};
 use crate::messaging::events::Event;
 use crate::storage::MemoryCache;
+use crate::utils::compute_highlights;
 
 pub struct Scheduler {
     scheduler: JobScheduler,
@@ -86,6 +87,7 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
         let cache = cache.clone();
         Box::pin(async move {
             let aoc_client = AoC::new();
+            //TODO: get year programmatically
             match aoc_client.private_leaderboard(2022).await {
                 Ok(scraped_leaderboard) => {
                     let mut data = cache.data.lock().unwrap();
@@ -145,15 +147,13 @@ async fn update_private_leaderboard_job(
 
                     let new_completions = {
                         let current_leaderboard = cache.data.lock().unwrap();
-                        scraped_leaderboard
-                            .leaderboard
-                            .compute_entries_differences_from(&current_leaderboard.leaderboard)
 
-                        // TODO: here we also might need to compute/retrieve anything we need to
-                        // provide informative message in template
-                        // https://github.com/ey3ball/fieldbot-aoc/blob/master/lib/aoc/rank/stats.ex#L109
-                        // - number of points added (diff of daily_scores_per_member for target days)
-                        // - is it completion of that specific day ? and if so what is delta
+                        let highlights = compute_highlights(
+                            &current_leaderboard.leaderboard,
+                            &scraped_leaderboard.leaderboard,
+                        );
+
+                        highlights
                     };
 
                     if !new_completions.is_empty() {
@@ -172,6 +172,11 @@ async fn update_private_leaderboard_job(
                     // Scoped to force 'data' to drop before 'await' so future can be Send.
                     {
                         let mut data = cache.data.lock().unwrap();
+                        // TODO: Here we replace the full leaderboard, so we can only have entries
+                        // of one specific year. However, we could also just append/unique the
+                        // entries if we wanted to handle multiple years.
+                        // Leaderboard functions could all be easily adapted to filter by year.
+                        // We should change the Vec<Solution> by HashSet<Solution>
                         *data = scraped_leaderboard;
                     }
 
@@ -224,7 +229,7 @@ async fn watch_global_leaderboard_job(
 
             let (year, day) = (2022, 9);
 
-            let mut known_hero_hits: Vec<(Identifier, ProblemPart)> = vec![];
+            let mut known_hero_hits: Vec<(String, ProblemPart)> = vec![];
 
             info!("Starting polling Global Leaderboard for day {day}.");
             let mut is_global_leaderboard_complete = false;
@@ -253,7 +258,7 @@ async fn watch_global_leaderboard_job(
                                 let (hero, part) = &hero_hit;
                                 if let Err(e) = sender
                                     .send(Event::GlobalLeaderboardHeroFound((
-                                        hero.name.clone(),
+                                        hero.clone(),
                                         part.to_string(),
                                     )))
                                     .await

@@ -1,6 +1,6 @@
 use crate::aoc::leaderboard::{LeaderboardStatistics, ScrapedLeaderboard, Solution};
 use crate::messaging::templates::MessageTemplate;
-use crate::utils::{categorize_leaderboard_entries, format_duration, ordinal_number_suffix};
+use crate::utils::{format_duration, ordinal_number_suffix, DayHighlight};
 use itertools::Itertools;
 use minijinja::context;
 use std::fmt;
@@ -17,7 +17,7 @@ pub enum Event {
     GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
     GlobalLeaderboardHeroFound((String, String)),
     DailyChallengeIsUp(String),
-    PrivateLeaderboardNewCompletions(Vec<Solution>),
+    PrivateLeaderboardNewCompletions(Vec<DayHighlight>),
     PrivateLeaderboardUpdated,
     DailySolutionsThreadToInitialize(u32),
     CommandReceived(SlackChannelId, SlackTs, Command),
@@ -40,11 +40,15 @@ impl Command {
         match start_with {
             cmd if cmd == COMMANDS[0] => Command::Help,
             cmd if cmd == COMMANDS[1] => {
+                // TODO: handle year
+                let year = 2015;
                 let data = leaderboard
                     .leaderboard
                     .standings_by_local_score()
+                    .get(&year)
+                    .unwrap_or(&vec![])
                     .into_iter()
-                    .map(|(m, s)| (m, s.to_string()))
+                    .map(|(m, s)| (m.clone(), s.to_string()))
                     .collect::<Vec<(String, String)>>();
                 Command::GetPrivateStandingByLocalScore(data, leaderboard.timestamp)
             }
@@ -129,12 +133,14 @@ impl fmt::Display for Event {
 
             Event::PrivateLeaderboardNewCompletions(completions) => {
                 // TODO: get day programmatically
-                let today: u8 = 9;
-                let (today_completions, late_completions) =
-                    categorize_leaderboard_entries(completions, today);
+                let (year, today): (i32, u8) = (2022, 9);
+
+                let is_today_completions = completions
+                    .iter()
+                    .into_group_map_by(|h| h.year == year && h.day == today);
 
                 let mut output = String::new();
-                if let Some(today_completions) = today_completions {
+                if let Some(today_completions) = is_today_completions.get(&true) {
                     output.push_str(
                         &MessageTemplate::NewTodayCompletions
                             .get()
@@ -142,7 +148,10 @@ impl fmt::Display for Event {
                             .unwrap(),
                     );
                 };
-                if let Some(late_completions) = late_completions {
+                if let Some(late_completions) = is_today_completions.get(&false) {
+                    if !output.is_empty() {
+                        output.push_str("\n");
+                    };
                     output.push_str(
                         &MessageTemplate::NewLateCompletions
                             .get()
