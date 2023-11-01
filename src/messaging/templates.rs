@@ -1,6 +1,5 @@
 use minijinja::{Environment, Template};
 use once_cell::sync::Lazy;
-
 use strum::{EnumIter, IntoEnumIterator};
 use tracing::info;
 
@@ -26,7 +25,10 @@ pub enum MessageTemplate {
     DailySolutionThread,
     GlobalStatistics,
     PrivateLeaderboardUpdated,
+    NewTodayCompletions,
+    NewLateCompletions,
     Ranking,
+    Leaderboard,
     Hero,
 }
 
@@ -37,8 +39,11 @@ impl MessageTemplate {
             MessageTemplate::DailyChallenge => "challenge.txt",
             MessageTemplate::DailySolutionThread => "solution_thread.txt",
             MessageTemplate::PrivateLeaderboardUpdated => "private_leaderboard_updated.txt",
+            MessageTemplate::NewTodayCompletions => "today_completions.txt",
+            MessageTemplate::NewLateCompletions => "late_completions.txt",
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
             MessageTemplate::Ranking => "ranking.txt",
+            MessageTemplate::Leaderboard => "leaderboard.txt",
             MessageTemplate::Hero => "hero.txt",
         }
     }
@@ -52,37 +57,66 @@ impl MessageTemplate {
         // \x20 (hex; 32 in decimal) is an ASCII space and an indicator for the first space to be preserved in this line of the string.
         match self {
             MessageTemplate::Help => {
-                ":sos: below are the bot commands:\n\
-                    \x20   `!help`: the commands\n\
-                    \x20   `!ranking`: current ranking by local score\n\
+                "🆘 below are the bot commands:\n\
+                 \x20 `!help`: the commands\n\
+                 \x20 `!standings [year]`: standings by local score for the current year [or specified year]\n\
+                 \x20 `!leaderboard [year]`: leaderboard state for the current year [or specified year]\n\
                 "
             },
             MessageTemplate::DailyChallenge => {
-                ":tada: Today's challenge is up!\n\
+                "🎉 Today's challenge is up!\n\
                     \x20 *{{title}}*
                 "
             },
             MessageTemplate::DailySolutionThread => {
-                ":point_down: Daily solution thread for *day {{day}}*"
+                "👇 *Daily discussion thread for day {{day}}*\n\
+                    \x20   Refrain yourself to open until you complete part 2!\n\
+                 🚨 *Spoilers Ahead* :rotating_light:"
             },
             MessageTemplate::PrivateLeaderboardUpdated => {
-                ":repeat: Private Leaderboard successfully updated!"
+                "🔁 Private Leaderboard successfully updated!"
+            },
+            MessageTemplate::NewTodayCompletions => {
+                "{%- for entry in completions %}\n\
+                    {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
+                    📣 {{entry.name}} just earned *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} {{ ['(day', entry.day, double, 'completed!)']|join(' ')  if both else ['for day', entry.day, single]|join(' ') }} +{{entry.new_points}}pts
+                    {%- endwith %}
+                 {%- endfor %}\n"
+            },
+            MessageTemplate::NewLateCompletions => {
+                "{%- for entry in completions %}\n\
+                    {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
+                    🚂  {{entry.name}} just catched up on *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }}) +{{entry.new_points}}pts
+                    {%- endwith %}
+                 {%- endfor %}"
             },
             MessageTemplate::GlobalStatistics => {
-                ":tada: Global Leaderboard complete for *day {{day}}*, here is how it went for the big dogs:\n\
-                    \x20 • Part 1 finish time range: *{{p1_fast}}* - *{{p1_slow}}*\n\
-                    \x20 • Part 2 finish time range: *{{p2_fast}}* - *{{p2_slow}}*\n\
-                    \x20 • Delta times range: {{delta_fast}} - {{delta_slow}}"
+                "📣 🌍 Global Leaderboard is complete for *day {{day}}*! Here is how it went for the big dogs:\n\
+                    \x20 • Part 1 finish time range: 🔥 *{{p1_fast}}* - *{{p1_slow}}* ❄️\n\
+                    \x20 • Part 2 finish time range: 🔥 *{{p2_fast}}* - *{{p2_slow}}* ❄️\n\
+                    \x20 • Delta times range: 🏃‍♀️ {{delta_fast}} - {{delta_slow}} 🚶‍♀️"
             }
             MessageTemplate::Ranking => {
-                ":first_place_medal: Current ranking as of {{timestamp}}:\n\
-                {%- for (name, score) in scores %}
-                    \x20 • {{name}} => {{score}}
+                "{% if current_year %}
+                    :first_place_medal: Current ranking as of {{timestamp}}:\n\
+                {% else %}
+                    :first_place_medal: Ranking from the {{ year }} event:\n\
+                {% endif %}
+                {%- for (name, score) in scores %}\n\
+                 • {{name}} \t {{score}}
                 {%- endfor %}"
             }
             MessageTemplate::Hero => {
-                ":tada: Our very own *{{ name }}* made it to the global leaderboard on part {{ part }}!"
+                "🎉 🥳 Our very own *{{ name }}* made it to the global leaderboard on part *{{ part }}*! (*{{ rank }}*) 🙌"
             },
+            MessageTemplate::Leaderboard => {
+                "{%- if current_year -%}
+                    📓 Current Leaderboard as of {{timestamp}}:
+                {%- else -%}
+                    📓 Learderboard from the {{ year }} event:
+                {%- endif -%}
+                ```{{ leaderboard }}```"
+            }
         }
     }
 }

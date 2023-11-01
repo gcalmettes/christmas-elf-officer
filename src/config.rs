@@ -5,7 +5,7 @@ use figment::{
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use std::path::Path;
-use tracing::{error, Level};
+use tracing::Level;
 
 const TRACE_LEVELS: [&'static str; 5] = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"];
 

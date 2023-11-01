@@ -1,13 +1,12 @@
+use crate::{
+    aoc::leaderboard::{Entry, Identifier, Leaderboard, ProblemPart, ScrapedLeaderboard},
+    config,
+    error::{BotError, BotResult},
+};
 use chrono::{TimeZone, Utc};
 use reqwest::{Client, StatusCode};
-use scraper::{Html, Node, Selector};
-use std::fmt;
-
-use std::collections::HashMap;
-
-use crate::aoc::leaderboard::{Identifier, Leaderboard, ProblemPart, ScrapedLeaderboard, Solution};
-use crate::config;
-use crate::error::{BotError, BotResult};
+use scraper::{Html, Selector};
+use std::{collections::HashMap, fmt};
 
 enum Endpoint {
     GlobalLeaderboard(i32, u8),
@@ -155,10 +154,8 @@ impl AoC {
                 span.parent().map_or(vec![], |p| {
                     p.next_siblings()
                         .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
-                        .filter_map(|entry| {
-                            Solution::from_html(entry, year, day, ProblemPart::FIRST)
-                        })
-                        .collect::<Vec<Solution>>()
+                        .filter_map(|entry| Entry::from_html(entry, year, day, ProblemPart::FIRST))
+                        .collect::<Vec<Entry>>()
                 })
             });
 
@@ -171,12 +168,10 @@ impl AoC {
                 span.parent().map_or(vec![], |p| {
                     p.next_siblings()
                         .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
-                        .filter_map(|entry| {
-                            Solution::from_html(entry, year, day, ProblemPart::SECOND)
-                        })
+                        .filter_map(|entry| Entry::from_html(entry, year, day, ProblemPart::SECOND))
                         // Filter out entries of first part.
                         .filter(|e| {
-                            !entries_first.contains(&Solution {
+                            !entries_first.contains(&Entry {
                                 id: e.id.clone(),
                                 timestamp: e.timestamp,
                                 rank: e.rank,
@@ -185,7 +180,7 @@ impl AoC {
                                 part: ProblemPart::FIRST,
                             })
                         })
-                        .collect::<Vec<Solution>>()
+                        .collect::<Vec<Entry>>()
                 })
             });
 
@@ -212,17 +207,17 @@ impl AoC {
         struct AOCPrivateLeaderboardMember {
             /// anonymous users appear with null names in the AoC API
             name: Option<String>,
-            global_score: u64,
+            // global_score: u64,
             // local_score: u64,
             id: u64,
             // last_star_ts: u64,
             // stars: u64,
             completion_day_level:
-                HashMap<String, HashMap<String, AOCPrivateLeaderboardMemberSolution>>,
+                HashMap<String, HashMap<String, AOCPrivateLeaderboardMemberEntry>>,
         }
 
         #[derive(Debug, Deserialize)]
-        struct AOCPrivateLeaderboardMemberSolution {
+        struct AOCPrivateLeaderboardMemberEntry {
             // star_index: u64,
             get_star_ts: i64,
         }
@@ -239,7 +234,7 @@ impl AoC {
             for (day, stars) in member.completion_day_level.iter() {
                 for (star, info) in stars.iter() {
                     let star = star.parse().map_err(|_| BotError::Parse)?;
-                    earned_stars.push(Solution {
+                    earned_stars.insert(Entry {
                         timestamp: Utc
                             .timestamp_opt(info.get_star_ts, 0)
                             .single()
@@ -251,15 +246,11 @@ impl AoC {
                         id: Identifier {
                             name: name.clone(),
                             numeric: member.id,
-                            global_score: member.global_score,
                         },
                     });
                 }
             }
         }
-
-        // Solutions are sorted chronologically
-        earned_stars.sort_unstable();
 
         Ok(earned_stars)
     }

@@ -15,3 +15,8 @@ Cargo.lock
 
 # Specific
 .env.local.yaml
+
+__pycache__/
+.direnv
+.envrc
+.tool-versions

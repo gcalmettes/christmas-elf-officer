@@ -1,21 +1,22 @@
-use crate::aoc::leaderboard::{LeaderboardStatistics, ScrapedLeaderboard};
-use crate::messaging::templates::MessageTemplate;
-use crate::utils::{format_duration, suffix};
+use crate::{
+    aoc::leaderboard::{LeaderboardStatistics, ProblemPart, ScrapedLeaderboard},
+    messaging::templates::MessageTemplate,
+    utils::{format_duration, format_rank, DayHighlight},
+};
+use chrono::{DateTime, Datelike, Local, Utc};
+use itertools::Itertools;
 use minijinja::context;
-use std::fmt;
-use std::iter::Iterator;
-
-use chrono::{DateTime, Local, Utc};
-
 use slack_morphism::{SlackChannelId, SlackTs};
+use std::{fmt, iter::Iterator};
 
-const COMMANDS: [&'static str; 2] = ["!help", "!ranking"];
+const COMMANDS: [&'static str; 3] = ["!help", "!standings", "!leaderboard"];
 
 #[derive(Debug)]
 pub enum Event {
     GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
-    GlobalLeaderboardHeroFound((String, String)),
+    GlobalLeaderboardHeroFound((String, ProblemPart, u8)),
     DailyChallengeIsUp(String),
+    PrivateLeaderboardNewCompletions(Vec<DayHighlight>),
     PrivateLeaderboardUpdated,
     DailySolutionsThreadToInitialize(u32),
     CommandReceived(SlackChannelId, SlackTs, Command),
@@ -24,7 +25,8 @@ pub enum Event {
 #[derive(Debug, Clone)]
 pub enum Command {
     Help,
-    GetPrivateStandingByLocalScore(Vec<(String, String)>, DateTime<Utc>),
+    GetPrivateStandingByLocalScore(i32, Vec<(String, String)>, DateTime<Utc>),
+    GetLeaderboardHistogram(i32, String, DateTime<Utc>),
 }
 
 impl Command {
@@ -34,28 +36,42 @@ impl Command {
     }
 
     pub fn build_from(input: String, leaderboard: &ScrapedLeaderboard) -> Command {
-        let start_with = input.trim().split(" ").next().unwrap();
+        let mut input = input.trim().split(" ");
+        let start_with = input.next().unwrap();
         match start_with {
             cmd if cmd == COMMANDS[0] => Command::Help,
             cmd if cmd == COMMANDS[1] => {
+                // !ranking
+
+                let year = match input.next().and_then(|y| y.parse::<i32>().ok()) {
+                    Some(y) => y,
+                    //TODO: get current year programmatically
+                    None => 2022,
+                };
                 let data = leaderboard
                     .leaderboard
-                    .standings_by_local_score()
+                    .standings_by_local_score_per_year()
+                    .get(&year)
+                    .unwrap_or(&vec![])
                     .into_iter()
-                    .map(|(m, s)| (m, s.to_string()))
+                    .map(|(m, s)| (m.clone(), s.to_string()))
                     .collect::<Vec<(String, String)>>();
-                Command::GetPrivateStandingByLocalScore(data, leaderboard.timestamp)
+                Command::GetPrivateStandingByLocalScore(year, data, leaderboard.timestamp)
+            }
+            cmd if cmd == COMMANDS[2] => {
+                // !leaderboard
+                let year = match input.next().and_then(|y| y.parse::<i32>().ok()) {
+                    Some(y) => y,
+                    //TODO: get current year programmatically
+                    None => 2022,
+                };
+
+                let formatted = leaderboard.leaderboard.show_year(year);
+                Command::GetLeaderboardHistogram(year, formatted, leaderboard.timestamp)
             }
             _ => unreachable!(),
         }
     }
-
-    // pub fn get_prefix(&self) -> &str {
-    //     match self {
-    //         Command::Help => &COMMANDS[0],
-    //         Command::GetPrivateStandingByLocalScore(..) => &COMMANDS[1],
-    //     }
-    // }
 }
 
 impl fmt::Display for Event {
@@ -88,23 +104,29 @@ impl fmt::Display for Event {
                         MessageTemplate::GlobalStatistics.get()
                         .render(context! {
                             day => day,
-                            p1_fast => statistics.p1_time_fast.map_or("N/A".to_string(), |d| format_duration(d)),
-                            p1_slow => statistics.p1_time_slow.map_or("N/A".to_string(), |d| format_duration(d)),
-                            p2_fast => statistics.p2_time_fast.map_or("N/A".to_string(), |d| format_duration(d)),
-                            p2_slow => statistics.p2_time_slow.map_or("N/A".to_string(), |d| format_duration(d)),
-                            delta_fast => statistics.delta_fast.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, suffix(rank))),
-                            delta_slow => statistics.delta_slow.map_or("N/A".to_string(), |(d, rank)| format!("*{}* ({}{})", format_duration(d), rank, suffix(rank))),
+                            p1_fast => statistics.p1_fast.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p1_slow => statistics.p1_slow.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p2_fast => statistics.p2_fast.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p2_slow => statistics.p2_slow.map_or("N/A".to_string(), |d| format_duration(d)),
+                            delta_fast => statistics.delta_fast.map_or("N/A".to_string(), |(d, rank)| {
+                                let rank = rank.unwrap_or_default();
+                                format!("*{}* ({})", format_duration(d), format_rank(rank))
+                            }),
+                            delta_slow => statistics.delta_slow.map_or("N/A".to_string(), |(d, rank)| {
+                                let rank = rank.unwrap_or_default();
+                                format!("*{}* ({})", format_duration(d), format_rank(rank))
+                            }),
                         })
                         .unwrap()
                 )
             }
-            Event::GlobalLeaderboardHeroFound((hero, part)) => {
+            Event::GlobalLeaderboardHeroFound((hero, part, rank)) => {
                 write!(
                     f,
                     "{}",
                     MessageTemplate::Hero
                         .get()
-                        .render(context! { name => hero, part => part })
+                        .render(context! { name => hero, part => part.to_string(), rank => format_rank(*rank) })
                         .unwrap()
                 )
             }
@@ -118,20 +140,65 @@ impl fmt::Display for Event {
                         .unwrap()
                 )
             }
-            Event::CommandReceived(_channel_id, ts, cmd) => match cmd {
+
+            Event::PrivateLeaderboardNewCompletions(completions) => {
+                // TODO: get day programmatically
+                let (year, today): (i32, u8) = (2022, 9);
+
+                let is_today_completions = completions
+                    .iter()
+                    .into_group_map_by(|h| h.year == year && h.day == today);
+
+                let mut output = String::new();
+                if let Some(today_completions) = is_today_completions.get(&true) {
+                    output.push_str(
+                        &MessageTemplate::NewTodayCompletions
+                            .get()
+                            .render(context! {completions => today_completions})
+                            .unwrap(),
+                    );
+                };
+                if let Some(late_completions) = is_today_completions.get(&false) {
+                    if !output.is_empty() {
+                        output.push_str("\n");
+                    };
+                    output.push_str(
+                        &MessageTemplate::NewLateCompletions
+                            .get()
+                            .render(context! {completions => late_completions})
+                            .unwrap(),
+                    );
+                };
+
+                write!(f, "{}", output)
+            }
+            Event::CommandReceived(_channel_id, _ts, cmd) => match cmd {
                 Command::Help => {
                     write!(f, "{}", MessageTemplate::Help.get().render({}).unwrap())
                 }
-                Command::GetPrivateStandingByLocalScore(data, time) => {
-                    let timestamp =
-                        format!("{}", time.with_timezone(&Local).format("%d/%m/%Y %H:%M:%S"));
+                Command::GetPrivateStandingByLocalScore(year, data, time) => {
+                    let now = time.with_timezone(&Local);
+                    let timestamp = format!("{}", now.format("%d/%m/%Y %H:%M:%S"));
 
                     write!(
                         f,
                         "{}",
                         MessageTemplate::Ranking
                             .get()
-                            .render(context! { timestamp => timestamp, scores => data })
+                            .render(context! { year => year, current_year => year == &now.year(), timestamp => timestamp, scores => data })
+                            .unwrap()
+                    )
+                }
+                Command::GetLeaderboardHistogram(year, histogram, time) => {
+                    let now = time.with_timezone(&Local);
+                    let timestamp = format!("{}", now.format("%d/%m/%Y %H:%M:%S"));
+
+                    write!(
+                        f,
+                        "{}",
+                        MessageTemplate::Leaderboard
+                            .get()
+                            .render(context! { year => year, current_year => year == &now.year(), timestamp => timestamp, leaderboard => histogram })
                             .unwrap()
                     )
                 }

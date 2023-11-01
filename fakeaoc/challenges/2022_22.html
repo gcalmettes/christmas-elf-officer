@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+<meta charset="utf-8"/>
+<title>Day 22 - Advent of Code 2022</title>
+<link rel="stylesheet" type="text/css" href="/static/style.css?31"/>
+<link rel="stylesheet alternate" type="text/css" href="/static/highcontrast.css?1" title="High Contrast"/>
+<link rel="shortcut icon" href="/favicon.png"/>
+<script>window.addEventListener('click', function(e,s,r){if(e.target.nodeName==='CODE'&&e.detail===3){s=window.getSelection();s.removeAllRanges();r=document.createRange();r.selectNodeContents(e.target);s.addRange(r);}});</script>
+</head><!--
+
+
+
+
+Oh, hello!  Funny seeing you here.
+
+I appreciate your enthusiasm, but you aren't going to find much down here.
+There certainly aren't clues to any of the puzzles.  The best surprises don't
+even appear in the source until you unlock them for real.
+
+Please be careful with automated requests; I'm not a massive company, and I can
+only take so much traffic.  Please be considerate so that everyone gets to play.
+
+If you're curious about how Advent of Code works, it's running on some custom
+Perl code. Other than a few integrations (auth, analytics, social media), I
+built the whole thing myself, including the design, animations, prose, and all
+of the puzzles.
+
+The puzzles are most of the work; preparing a new calendar and a new set of
+puzzles each year takes all of my free time for 4-5 months. A lot of effort
+went into building this thing - I hope you're enjoying playing it as much as I
+enjoyed making it for you!
+
+If you'd like to hang out, I'm @ericwastl@hachyderm.io on Mastodon and
+@ericwastl on Twitter.
+
+- Eric Wastl
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-->
+<body>
+<header><div><h1 class="title-global"><a href="/">Advent of Code</a></h1><nav><ul><li><a href="/2022/about">[About]</a></li><li><a href="/2022/events">[Events]</a></li><li><a href="https://teespring.com/stores/advent-of-code" target="_blank">[Shop]</a></li><li><a href="/2022/auth/login">[Log In]</a></li></ul></nav></div><div><h1 class="title-event">&nbsp;&nbsp;&nbsp;<span class="title-event-wrap">sub y{</span><a href="/2022">2022</a><span class="title-event-wrap">}</span></h1><nav><ul><li><a href="/2022">[Calendar]</a></li><li><a href="/2022/support">[AoC++]</a></li><li><a href="/2022/sponsors">[Sponsors]</a></li><li><a href="/2022/leaderboard">[Leaderboard]</a></li><li><a href="/2022/stats">[Stats]</a></li></ul></nav></div></header>
+
+<div id="sidebar">
+<div id="sponsor"><div class="quiet">Our <a href="/2022/sponsors">sponsors</a> help make Advent of Code possible:</div><div class="sponsor"><a href="https://ahrefs.com/" target="_blank" onclick="if(ga)ga('send','event','sponsor','sidebar',this.href);" rel="noopener">Ahrefs</a> - Work on the next general purpose search engine, a world-class crawler, and real big data. Leveraging bleeding-edge hardware and advanced programming technologies. From anywhere in the world. OCaml, ReasonML, Dlang, C++</div></div>
+</div><!--/sidebar-->
+
+<main>
+<article class="day-desc"><h2>--- Day 22: Monkey Map ---</h2><p>The monkeys take you on a surprisingly easy trail through the jungle. They're even going in roughly the right direction according to your handheld device's Grove Positioning System.</p>
+<p>As you walk, the monkeys explain that the grove is protected by a <em>force field</em>. To pass through the force field, you have to enter a password; doing so involves tracing a specific <em>path</em> on a strangely-shaped board.</p>
+<p>At least, you're pretty sure that's what you have to do; the elephants aren't exactly fluent in monkey.</p>
+<p>The monkeys give you notes that they took when they last saw the password entered (your puzzle input).</p>
+<p>For example:</p>
+<pre><code>        ...#
+        .#..
+        #...
+        ....
+...#.......#
+........#...
+..#....#....
+..........#.
+        ...#....
+        .....#..
+        .#......
+        ......#.
+
+10R5L5R10L4R5L5
+</code></pre>
+<p>The first half of the monkeys' notes is a <em>map of the board</em>. It is comprised of a set of <em>open tiles</em> (on which you can move, drawn <code>.</code>) and <em>solid walls</em> (tiles which you cannot enter, drawn <code>#</code>).</p>
+<p>The second half is a description of <em>the path you must follow</em>. It consists of alternating numbers and letters:</p>
+<ul>
+<li>A <em>number</em> indicates the <em>number of tiles to move</em> in the direction you are facing. If you run into a wall, you stop moving forward and continue with the next instruction.</li>
+<li>A <em>letter</em> indicates whether to turn 90 degrees <em>clockwise</em> (<code>R</code>) or <em><span title="Or &quot;anticlockwise&quot;, if you're anti-counterclockwise.">counterclockwise</span></em> (<code>L</code>). Turning happens in-place; it does not change your current tile.</li>
+</ul>
+<p>So, a path like <code>10R5</code> means "go forward 10 tiles, then turn clockwise 90 degrees, then go forward 5 tiles".</p>
+<p>You begin the path in the leftmost open tile of the top row of tiles. Initially, you are facing <em>to the right</em> (from the perspective of how the map is drawn).</p>
+<p>If a movement instruction would take you off of the map, you <em>wrap around</em> to the other side of the board. In other words, if your next tile is off of the board, you should instead look in the direction opposite of your current facing as far as you can until you find the opposite edge of the board, then reappear there.</p>
+<p>For example, if you are at <code>A</code> and facing to the right, the tile in front of you is marked <code>B</code>; if you are at <code>C</code> and facing down, the tile in front of you is marked <code>D</code>:</p>
+<pre><code>        ...#
+        .#..
+        #...
+        ....
+...#.<em>D</em>.....#
+........#...
+<em>B</em>.#....#...<em>A</em>
+.....<em>C</em>....#.
+        ...#....
+        .....#..
+        .#......
+        ......#.
+</code></pre>
+<p>It is possible for the next tile (after wrapping around) to be a <em>wall</em>; this still counts as there being a wall in front of you, and so movement stops before you actually wrap to the other side of the board.</p>
+<p>By drawing the <em>last facing you had</em> with an arrow on each tile you visit, the full path taken by the above example looks like this:</p>
+<pre><code>        &gt;&gt;v#    
+        .#v.    
+        #.v.    
+        ..v.    
+...#...v..v#    
+&gt;&gt;&gt;v...<em>&gt;</em>#.&gt;&gt;    
+..#v...#....    
+...&gt;&gt;&gt;&gt;v..#.    
+        ...#....
+        .....#..
+        .#......
+        ......#.
+</code></pre>
+<p>To finish providing the password to this strange input device, you need to determine numbers for your final <em>row</em>, <em>column</em>, and <em>facing</em> as your final position appears from the perspective of the original map. Rows start from <code>1</code> at the top and count downward; columns start from <code>1</code> at the left and count rightward. (In the above example, row 1, column 1 refers to the empty space with no tile on it in the top-left corner.) Facing is <code>0</code> for right (<code>&gt;</code>), <code>1</code> for down (<code>v</code>), <code>2</code> for left (<code>&lt;</code>), and <code>3</code> for up (<code>^</code>). The <em>final password</em> is the sum of 1000 times the row, 4 times the column, and the facing.</p>
+<p>In the above example, the final row is <code>6</code>, the final column is <code>8</code>, and the final facing is <code>0</code>. So, the final password is 1000 * 6 + 4 * 8 + 0: <code><em>6032</em></code>.</p>
+<p>Follow the path given in the monkeys' notes. <em>What is the final password?</em></p>
+</article>
+<p>To play, please identify yourself via one of these services:</p>
+<p><a href="/auth/github">[GitHub]</a> <a href="/auth/google">[Google]</a> <a href="/auth/twitter">[Twitter]</a> <a href="/auth/reddit">[Reddit]</a> <span class="quiet">- <a href="/about#faq_auth">[How Does Auth Work?]</a></span></p>
+</main>
+
+<!-- ga -->
+<script>
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+ga('create', 'UA-69522494-1', 'auto');
+ga('set', 'anonymizeIp', true);
+ga('send', 'pageview');
+</script>
+<!-- /ga -->
+</body>
+</html>

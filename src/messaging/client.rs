@@ -1,7 +1,9 @@
-use crate::config;
-use crate::error::BotError;
-use crate::messaging::events::{Command, Event};
-use crate::storage::MemoryCache;
+use crate::{
+    config,
+    error::BotError,
+    messaging::events::{Command, Event},
+    storage::MemoryCache,
+};
 use http::StatusCode;
 use slack_morphism::{
     api::SlackApiChatPostMessageRequest,
@@ -96,7 +98,7 @@ impl AoCSlackClient {
                             // If Solution thread initialization, post a first message in thread
                             if let Event::DailySolutionsThreadToInitialize(_day) = event {
                                 let thread_ts = res.ts;
-                                let message = format!("Show me your best move!");
+                                let message = format!(":warning: Last warning, spoiler ahead!");
                                 let first_thread_message = SlackApiChatPostMessageRequest::new(
                                     channel_id,
                                     SlackMessageContent::new().with_text(message),

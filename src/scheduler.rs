@@ -1,18 +1,16 @@
+use crate::{
+    aoc::client::AoC,
+    config,
+    error::{BotError, BotResult},
+    messaging::events::Event,
+    storage::MemoryCache,
+    utils::compute_highlights,
+};
 use chrono::{Datelike, Utc};
-use std::time::Duration;
-use tokio::sync::mpsc::Sender;
-use tokio::time;
+use std::{sync::Arc, time::Duration};
+use tokio::{sync::mpsc::Sender, time};
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{error, info};
-
-use std::sync::Arc;
-
-use crate::aoc::client::AoC;
-use crate::aoc::leaderboard::{Identifier, ProblemPart};
-use crate::config;
-use crate::error::{BotError, BotResult};
-use crate::messaging::events::Event;
-use crate::storage::MemoryCache;
 
 pub struct Scheduler {
     scheduler: JobScheduler,
@@ -30,7 +28,6 @@ pub enum JobProcess<'schedule> {
 
 impl Scheduler {
     pub async fn new(cache: MemoryCache, sender: Arc<Sender<Event>>) -> BotResult<Self> {
-        // let cache = MemoryCache::new();
         let scheduler = JobScheduler::new().await?;
         Ok(Scheduler {
             scheduler,
@@ -85,16 +82,20 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
         let cache = cache.clone();
         Box::pin(async move {
             let aoc_client = AoC::new();
-            match aoc_client.private_leaderboard(2022).await {
-                Ok(scraped_leaderboard) => {
-                    let mut data = cache.data.lock().unwrap();
-                    *data = scraped_leaderboard;
-                }
-                Err(e) => {
-                    let error = BotError::AOC(format!("Could not scrape leaderboard. {e}"));
-                    error!("{error}");
-                }
-            };
+            //TODO: get year programmatically
+            //let year = 2022
+            for year in 2015..=2022 {
+                match aoc_client.private_leaderboard(year).await {
+                    Ok(scraped_leaderboard) => {
+                        let mut data = cache.data.lock().unwrap();
+                        data.merge_with(scraped_leaderboard);
+                    }
+                    Err(e) => {
+                        let error = BotError::AOC(format!("Could not scrape leaderboard. {e}"));
+                        error!("{error}");
+                    }
+                };
+            }
         })
     })?;
     Ok(job)
@@ -134,11 +135,44 @@ async fn update_private_leaderboard_job(
             let aoc_client = AoC::new();
             match aoc_client.private_leaderboard(2022).await {
                 Ok(scraped_leaderboard) => {
-                    // Scoped to force 'data' to drop before 'await' so future can be Send
+                    // TODO: check for new members, and if so announce it.
+                    // Message could include something like "XX has joined the battle field! now every star provide x number of
+                    // points". No worries, changes have been automatically applied to past stars.
+
+                    // TODO: check for lost members, and if so announce it ?
+                    // Message could include something like "now every star provide x number of
+                    // points".
+
+                    let new_completions = {
+                        let current_leaderboard = cache.data.lock().unwrap();
+
+                        let highlights = compute_highlights(
+                            &current_leaderboard.leaderboard,
+                            &scraped_leaderboard.leaderboard,
+                        );
+
+                        highlights
+                    };
+
+                    if !new_completions.is_empty() {
+                        if let Err(e) = sender
+                            .send(Event::PrivateLeaderboardNewCompletions(new_completions))
+                            .await
+                        {
+                            let error = BotError::ChannelSend(format!(
+                                "Could not send message to MPSC channel. {e}"
+                            ));
+                            error!("{error}");
+                        };
+                    }
+
+                    // Save new leadearboard in cache.
+                    // Scoped to force 'data' to drop before 'await' so future can be Send.
                     {
                         let mut data = cache.data.lock().unwrap();
-                        *data = scraped_leaderboard;
+                        data.merge_with(scraped_leaderboard);
                     }
+
                     if let Err(e) = sender.send(Event::PrivateLeaderboardUpdated).await {
                         let error = BotError::ChannelSend(format!(
                             "Could not send message to MPSC channel. {e}"
@@ -168,7 +202,7 @@ async fn watch_global_leaderboard_job(
     cache: MemoryCache,
     sender: Arc<Sender<Event>>,
 ) -> BotResult<Job> {
-    let job = Job::new_async(schedule, move |uuid, mut l| {
+    let job = Job::new_async(schedule, move |_uuid, _l| {
         let cache = cache.clone();
         let sender = sender.clone();
 
@@ -188,35 +222,40 @@ async fn watch_global_leaderboard_job(
 
             let (year, day) = (2022, 9);
 
-            let mut known_hero_hits: Vec<(Identifier, ProblemPart)> = vec![];
+            // let mut known_hero_hits: Vec<(&String, ProblemPart, u8)> = vec![];
+            let mut known_hero_hashes: Vec<String> = vec![];
 
             info!("Starting polling Global Leaderboard for day {day}.");
-            let mut global_leaderboard_is_complete = false;
+            let mut is_global_leaderboard_complete = false;
 
-            while !global_leaderboard_is_complete {
+            while !is_global_leaderboard_complete {
                 info!("Global Leaderboard for day {day} not complete yet.");
                 match aoc_client.global_leaderboard(year, day).await {
                     Ok(global_leaderboard) => {
-                        // 100 entries for each part, so completion is 2*100
-                        global_leaderboard_is_complete = global_leaderboard.is_count_equal_to(200);
+                        is_global_leaderboard_complete =
+                            global_leaderboard.leaderboard.is_global_complete();
 
                         // Scoped to not held data across .await
-                        let hero_hits = {
+                        let hero_entries = {
                             // check if private members made it to the global leaderboard
                             let private_leaderboard = cache.data.lock().unwrap();
                             global_leaderboard
-                                .check_for_private_members(&private_leaderboard.leaderboard)
+                                .leaderboard
+                                .get_members_entries_union_with(&private_leaderboard.leaderboard)
                         };
 
-                        for hero_hit in hero_hits {
+                        for entry in hero_entries {
+                            let entry_hash = entry.to_key();
                             // If not already known, send shoutout to hero
-                            if !known_hero_hits.contains(&hero_hit) {
-                                let (hero, part) = &hero_hit;
+                            if !known_hero_hashes.contains(&entry_hash) {
+                                // let (name, part, rank) = &hero_hit;
+                                let (name, part, rank) = (
+                                    entry.id.name.clone(),
+                                    entry.part,
+                                    entry.rank.unwrap_or_default(),
+                                );
                                 if let Err(e) = sender
-                                    .send(Event::GlobalLeaderboardHeroFound((
-                                        hero.name.clone(),
-                                        part.to_string(),
-                                    )))
+                                    .send(Event::GlobalLeaderboardHeroFound((name, part, rank)))
                                     .await
                                 {
                                     let error = BotError::ChannelSend(format!(
@@ -225,26 +264,35 @@ async fn watch_global_leaderboard_job(
                                     error!("{error}");
                                 } else {
                                     // Announcement successful, let's register the hero.
-                                    known_hero_hits.push(hero_hit);
+                                    known_hero_hashes.push(entry_hash);
                                 };
                             }
                         }
 
-                        if global_leaderboard_is_complete {
-                            info!("Global Leaderboard for day {day} is complete!");
-
-                            if let Err(e) = sender
-                                .send(Event::GlobalLeaderboardComplete((
-                                    day,
-                                    global_leaderboard.statistics(year, day),
-                                )))
-                                .await
+                        if is_global_leaderboard_complete {
+                            info!("Global Leaderboard for day {day} is now complete!");
+                            match global_leaderboard
+                                .leaderboard
+                                .statistics_for_year_day(year, day)
                             {
-                                let error = BotError::ChannelSend(format!(
-                                    "Could not send message to MPSC channel. {e}"
-                                ));
-                                error!("{error}");
-                            };
+                                Ok(stats) => {
+                                    if let Err(e) = sender
+                                        .send(Event::GlobalLeaderboardComplete((day, stats)))
+                                        .await
+                                    {
+                                        let error = BotError::ChannelSend(format!(
+                                            "Could not send message to MPSC channel. {e}"
+                                        ));
+                                        error!("{error}");
+                                    };
+                                }
+                                Err(e) => {
+                                    let error = BotError::Compute(format!(
+                                        "Could not compute global statistics. {e}"
+                                    ));
+                                    error!("{error}");
+                                }
+                            }
                         }
                     }
                     Err(e) => {
@@ -262,7 +310,7 @@ async fn watch_global_leaderboard_job(
 }
 
 async fn parse_daily_challenge_job(schedule: &str, sender: Arc<Sender<Event>>) -> BotResult<Job> {
-    let job = Job::new_async(schedule, move |uuid, mut l| {
+    let job = Job::new_async(schedule, move |_uuid, _l| {
         let sender = sender.clone();
         Box::pin(async move {
             let aoc_client = AoC::new();
