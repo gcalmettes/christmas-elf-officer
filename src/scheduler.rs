@@ -1,5 +1,4 @@
 use chrono::{Datelike, Utc};
-use itertools::Itertools;
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
 use tokio::time;
@@ -9,7 +8,6 @@ use tracing::{error, info};
 use std::sync::Arc;
 
 use crate::aoc::client::AoC;
-use crate::aoc::leaderboard::{Identifier, ProblemPart};
 use crate::config;
 use crate::error::{BotError, BotResult};
 use crate::messaging::events::Event;
@@ -32,7 +30,6 @@ pub enum JobProcess<'schedule> {
 
 impl Scheduler {
     pub async fn new(cache: MemoryCache, sender: Arc<Sender<Event>>) -> BotResult<Self> {
-        // let cache = MemoryCache::new();
         let scheduler = JobScheduler::new().await?;
         Ok(Scheduler {
             scheduler,
@@ -229,7 +226,8 @@ async fn watch_global_leaderboard_job(
 
             let (year, day) = (2022, 9);
 
-            let mut known_hero_hits: Vec<(String, ProblemPart)> = vec![];
+            // let mut known_hero_hits: Vec<(&String, ProblemPart, u8)> = vec![];
+            let mut known_hero_hashes: Vec<String> = vec![];
 
             info!("Starting polling Global Leaderboard for day {day}.");
             let mut is_global_leaderboard_complete = false;
@@ -242,25 +240,26 @@ async fn watch_global_leaderboard_job(
                             global_leaderboard.leaderboard.is_global_complete();
 
                         // Scoped to not held data across .await
-                        let hero_hits = {
+                        let hero_entries = {
                             // check if private members made it to the global leaderboard
                             let private_leaderboard = cache.data.lock().unwrap();
                             global_leaderboard
                                 .leaderboard
-                                .look_for_other_leaderboard_members(
-                                    &private_leaderboard.leaderboard,
-                                )
+                                .get_members_entries_union_with(&private_leaderboard.leaderboard)
                         };
 
-                        for hero_hit in hero_hits {
+                        for entry in hero_entries {
+                            let entry_hash = entry.to_key();
                             // If not already known, send shoutout to hero
-                            if !known_hero_hits.contains(&hero_hit) {
-                                let (hero, part) = &hero_hit;
+                            if !known_hero_hashes.contains(&entry_hash) {
+                                // let (name, part, rank) = &hero_hit;
+                                let (name, part, rank) = (
+                                    entry.id.name.clone(),
+                                    entry.part,
+                                    entry.rank.unwrap_or_default(),
+                                );
                                 if let Err(e) = sender
-                                    .send(Event::GlobalLeaderboardHeroFound((
-                                        hero.clone(),
-                                        part.to_string(),
-                                    )))
+                                    .send(Event::GlobalLeaderboardHeroFound((name, part, rank)))
                                     .await
                                 {
                                     let error = BotError::ChannelSend(format!(
@@ -269,14 +268,17 @@ async fn watch_global_leaderboard_job(
                                     error!("{error}");
                                 } else {
                                     // Announcement successful, let's register the hero.
-                                    known_hero_hits.push(hero_hit);
+                                    known_hero_hashes.push(entry_hash);
                                 };
                             }
                         }
 
                         if is_global_leaderboard_complete {
                             info!("Global Leaderboard for day {day} is now complete!");
-                            match global_leaderboard.leaderboard.daily_statistics(year, day) {
+                            match global_leaderboard
+                                .leaderboard
+                                .statistics_for_year_day(year, day)
+                            {
                                 Ok(stats) => {
                                     if let Err(e) = sender
                                         .send(Event::GlobalLeaderboardComplete((day, stats)))

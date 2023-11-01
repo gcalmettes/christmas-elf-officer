@@ -1,6 +1,6 @@
-use crate::aoc::leaderboard::{LeaderboardStatistics, ScrapedLeaderboard, Solution};
+use crate::aoc::leaderboard::{LeaderboardStatistics, ProblemPart, ScrapedLeaderboard};
 use crate::messaging::templates::MessageTemplate;
-use crate::utils::{format_duration, ordinal_number_suffix, DayHighlight};
+use crate::utils::{format_duration, format_rank, DayHighlight};
 use itertools::Itertools;
 use minijinja::context;
 use std::fmt;
@@ -15,7 +15,7 @@ const COMMANDS: [&'static str; 2] = ["!help", "!ranking"];
 #[derive(Debug)]
 pub enum Event {
     GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
-    GlobalLeaderboardHeroFound((String, String)),
+    GlobalLeaderboardHeroFound((String, ProblemPart, u8)),
     DailyChallengeIsUp(String),
     PrivateLeaderboardNewCompletions(Vec<DayHighlight>),
     PrivateLeaderboardUpdated,
@@ -41,10 +41,10 @@ impl Command {
             cmd if cmd == COMMANDS[0] => Command::Help,
             cmd if cmd == COMMANDS[1] => {
                 // TODO: handle year
-                let year = 2015;
+                let year = 2022;
                 let data = leaderboard
                     .leaderboard
-                    .standings_by_local_score()
+                    .standings_by_local_score_per_year()
                     .get(&year)
                     .unwrap_or(&vec![])
                     .into_iter()
@@ -100,23 +100,23 @@ impl fmt::Display for Event {
                             p2_slow => statistics.p2_slow.map_or("N/A".to_string(), |d| format_duration(d)),
                             delta_fast => statistics.delta_fast.map_or("N/A".to_string(), |(d, rank)| {
                                 let rank = rank.unwrap_or_default();
-                                format!("*{}* ({}{})", format_duration(d), rank, ordinal_number_suffix(rank))
+                                format!("*{}* ({})", format_duration(d), format_rank(rank))
                             }),
                             delta_slow => statistics.delta_slow.map_or("N/A".to_string(), |(d, rank)| {
                                 let rank = rank.unwrap_or_default();
-                                format!("*{}* ({}{})", format_duration(d), rank, ordinal_number_suffix(rank))
+                                format!("*{}* ({})", format_duration(d), format_rank(rank))
                             }),
                         })
                         .unwrap()
                 )
             }
-            Event::GlobalLeaderboardHeroFound((hero, part)) => {
+            Event::GlobalLeaderboardHeroFound((hero, part, rank)) => {
                 write!(
                     f,
                     "{}",
                     MessageTemplate::Hero
                         .get()
-                        .render(context! { name => hero, part => part })
+                        .render(context! { name => hero, part => part, rank => format_rank(*rank) })
                         .unwrap()
                 )
             }

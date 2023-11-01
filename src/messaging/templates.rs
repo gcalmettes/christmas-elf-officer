@@ -56,44 +56,43 @@ impl MessageTemplate {
         // \x20 (hex; 32 in decimal) is an ASCII space and an indicator for the first space to be preserved in this line of the string.
         match self {
             MessageTemplate::Help => {
-                ":sos: below are the bot commands:\n\
+                "🆘 below are the bot commands:\n\
                     \x20   `!help`: the commands\n\
                     \x20   `!ranking`: current ranking by local score\n\
                 "
             },
             MessageTemplate::DailyChallenge => {
-                ":tada: Today's challenge is up!\n\
+                "🎉 Today's challenge is up!\n\
                     \x20 *{{title}}*
                 "
             },
             MessageTemplate::DailySolutionThread => {
-                ":point_down: *Daily discussion thread for day {{day}}*\n\
+                "👇 *Daily discussion thread for day {{day}}*\n\
                     \x20   Refrain yourself to open until you complete part 2!\n\
-                 :rotating_light: *Spoilers Ahead* :rotating_light:"
+                 🚨 *Spoilers Ahead* :rotating_light:"
             },
             MessageTemplate::PrivateLeaderboardUpdated => {
-                ":repeat: Private Leaderboard successfully updated!"
+                "🔁 Private Leaderboard successfully updated!"
             },
             MessageTemplate::NewTodayCompletions => {
                 "{%- for entry in completions %}\n\
                     {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
-                    :mega:  {{entry.name}} just earned *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} {{ ['(day', entry.day, double, 'completed!)']|join(' ')  if both else ['for day', entry.day, single]|join(' ') }} +{{entry.new_points}}pts
+                    📣 {{entry.name}} just earned *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} {{ ['(day', entry.day, double, 'completed!)']|join(' ')  if both else ['for day', entry.day, single]|join(' ') }} +{{entry.new_points}}pts
                     {%- endwith %}
-                 {%- endfor %}"
+                 {%- endfor %}\n"
             },
             MessageTemplate::NewLateCompletions => {
-                "Catching up on some past days:\n\
-                {%- for entry in completions %}\n\
+                "{%- for entry in completions %}\n\
                     {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
-                    :mega:  {{entry.name}} just earned *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }}) +{{entry.new_points}}pts
+                    🚂  {{entry.name}} just catched up on *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }}) +{{entry.new_points}}pts
                     {%- endwith %}
                  {%- endfor %}"
             },
             MessageTemplate::GlobalStatistics => {
-                ":tada: Global Leaderboard complete for *day {{day}}*, here is how it went for the big dogs:\n\
-                    \x20 • Part 1 finish time range: *{{p1_fast}}* - *{{p1_slow}}*\n\
-                    \x20 • Part 2 finish time range: *{{p2_fast}}* - *{{p2_slow}}*\n\
-                    \x20 • Delta times range: {{delta_fast}} - {{delta_slow}}"
+                "📣 🌍 Global Leaderboard is complete for *day {{day}}*! Here is how it went for the big dogs:\n\
+                    \x20 • Part 1 finish time range: 🔥 *{{p1_fast}}* - *{{p1_slow}}* ❄️\n\
+                    \x20 • Part 2 finish time range: 🔥 *{{p2_fast}}* - *{{p2_slow}}* ❄️\n\
+                    \x20 • Delta times range: 🏃‍♀️ {{delta_fast}} - {{delta_slow}} 🚶‍♀️"
             }
             MessageTemplate::Ranking => {
                 ":first_place_medal: Current ranking as of {{timestamp}}:\n\
@@ -102,7 +101,7 @@ impl MessageTemplate {
                 {%- endfor %}"
             }
             MessageTemplate::Hero => {
-                ":tada: Our very own *{{ name }}* made it to the global leaderboard on part {{ part }}!"
+                "🎉 🥳 Our very own *{{ name }}* made it to the global leaderboard on part *{{ part }}*! (*{{ rank }}*) 🙌"
             },
         }
     }
