@@ -44,15 +44,15 @@ pub struct DayHighlight {
 
 /// Retrieve needed info to compute highlights statistics
 pub fn compute_highlights(current: &Leaderboard, new: &Leaderboard) -> Vec<DayHighlight> {
-    let new_entries = new.get_members_entries_differences_with(current);
+    let new_entries = new.difference(current).collect::<HashSet<_>>();
 
     // buffers
     let mut target_days_per_member = HashMap::new();
     let mut target_year_day_combinations = HashSet::new();
 
-    new_entries.into_iter().for_each(|e| {
+    new_entries.iter().for_each(|e| {
         target_days_per_member
-            .entry((e.year, e.id))
+            .entry((e.year, e.id.clone()))
             .or_insert(vec![])
             .push(e.day);
         target_year_day_combinations.insert((e.year, e.day));

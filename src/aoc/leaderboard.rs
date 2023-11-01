@@ -317,30 +317,11 @@ impl Leaderboard {
             .collect()
     }
 
-    pub fn get_members_entries_union_with(&self, other_leaderboard: &Leaderboard) -> Vec<&Entry> {
-        let other_members_ids = other_leaderboard.members_ids();
+    pub fn get_members_entries_union_with(&self, other: &Leaderboard) -> Vec<&Entry> {
+        let other_members_ids = other.members_ids();
         self.iter()
             .filter(|entry| other_members_ids.contains(&entry.id.numeric))
             .collect::<Vec<&Entry>>()
-    }
-
-    pub fn get_members_entries_differences_with(
-        &self,
-        current_leaderboard: &Leaderboard,
-    ) -> Vec<Entry> {
-        let current_solutions = current_leaderboard
-            .iter()
-            .map(|s| (s.id.numeric, s.day, s.part))
-            .collect::<Vec<(u64, u8, ProblemPart)>>();
-
-        self.iter()
-            .filter_map(
-                |s| match !current_solutions.contains(&(s.id.numeric, s.day, s.part)) {
-                    true => Some(s.clone()),
-                    false => None,
-                },
-            )
-            .collect()
     }
 
     /// (year, day, part) => [ordered members]
