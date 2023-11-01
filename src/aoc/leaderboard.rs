@@ -1,14 +1,15 @@
 use crate::error::{BotError, BotResult};
 use chrono::{naive::NaiveDateTime, DateTime, Duration, TimeZone, Utc};
-use itertools::Itertools;
-use itertools::MinMaxResult;
+use itertools::{Itertools, MinMaxResult};
 use scraper::{Node, Selector};
 use serde::Serialize;
-use std::cmp::Reverse;
-use std::collections::{HashMap, HashSet};
-use std::fmt;
-use std::iter::Iterator;
-use std::ops::{Deref, DerefMut};
+use std::{
+    cmp::Reverse,
+    collections::{HashMap, HashSet},
+    fmt,
+    iter::Iterator,
+    ops::{Deref, DerefMut},
+};
 
 static AOC_PUZZLE_UTC_STARTING_HOUR: u32 = 5;
 static AOC_MONTH: u32 = 12;
@@ -21,7 +22,7 @@ pub enum ProblemPart {
 
 // Leaderboard entry parsed from AoC API.
 // Year and day fields match corresponding components of DateTime<Utc>.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize)]
+#[derive(Debug, Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Serialize)]
 pub struct Entry {
     pub timestamp: DateTime<Utc>,
     pub year: i32,
@@ -38,7 +39,7 @@ pub struct Identifier {
     pub numeric: u64,
 }
 
-type Entries = Vec<Entry>;
+type Entries = HashSet<Entry>;
 
 #[derive(Debug)]
 pub struct Leaderboard(Entries);
@@ -278,6 +279,37 @@ impl Leaderboard {
         )
     }
 
+    /// (year, id) => [(n stars, score per day) for that year]
+    pub fn daily_stars_scores_per_year_member(
+        &self,
+    ) -> HashMap<(i32, &Identifier), [(u8, usize); 25]> {
+        // Max point earned for each star is number of members in leaderboard
+        let members_solutions = self.entries_per_year_member();
+        let n_members_per_year = members_solutions
+            .iter()
+            .map(|((y, id), _)| (y, id))
+            .into_grouping_map_by(|(y, _)| *y)
+            .fold(0, |acc, _key, _val| acc + 1);
+
+        let standings_per_challenge = self.ranked_members_per_year_day_part();
+        standings_per_challenge.iter().fold(
+            HashMap::new(),
+            |mut acc, ((year, day, _part), star_rank)| {
+                star_rank
+                    .iter()
+                    .enumerate()
+                    .for_each(|(rank_minus_one, id)| {
+                        // unwrap is safe here as we know the year exists
+                        let star_score = n_members_per_year.get(&year).unwrap() - rank_minus_one;
+                        let day_stars_scores = acc.entry((*year, id)).or_insert([(0, 0); 25]);
+                        day_stars_scores[(*day - 1) as usize].0 += 1;
+                        day_stars_scores[(*day - 1) as usize].1 += star_score;
+                    });
+                acc
+            },
+        )
+    }
+
     fn local_scores_per_year_member(&self) -> HashMap<(i32, &Identifier), usize> {
         self.daily_scores_per_year_member()
             .iter()
@@ -507,6 +539,71 @@ impl Leaderboard {
         };
         Ok(stats)
     }
+
+    pub fn show_year(&self, year: i32) -> String {
+        let scores = self.daily_stars_scores_per_year_member();
+        let entries = scores
+            .iter()
+            .filter(|((y, _id), _scores)| y == &year)
+            .map(|((_y, id), scores)| {
+                // we compute total score, and total number of stars
+                (
+                    id,
+                    scores,
+                    scores.iter().fold((0, 0), |acc, s| {
+                        // (number of stars, score)
+                        (acc.0 + s.0, acc.1 + s.1)
+                    }),
+                )
+            })
+            // sort by score descending, then by star count descending
+            .sorted_unstable_by_key(|entry| (Reverse(entry.2 .1), Reverse(entry.2 .0)))
+            .collect::<Vec<_>>();
+
+        // calculate width for positions
+        // the width of the maximum position to be displayed, plus one for ')'
+        let width_pos = entries.len().to_string().len();
+
+        // calculate width for names
+        // the length of the longest name, plus one for ':'
+        let width_name = 1 + entries
+            .iter()
+            .map(|(id, _scores, (_n_stars, _total))| id.name.len())
+            .max()
+            .unwrap_or_default();
+
+        // calculate width for scores
+        // the width of the maximum score, formatted to two decimal places
+        let width_score = entries
+            .iter()
+            .map(|(_id, _scores, (_n_stars, total))| total)
+            .max()
+            .map(|s| 1 + s.to_string().len())
+            .unwrap_or_default();
+
+        entries
+            .iter()
+            .enumerate()
+            .map(|(idx, (id, scores, (_n_stars, total)))| {
+                format!(
+                    "{:>width_pos$}) {:<width_name$} {:>width_score$}  [{}]",
+                    // idx is zero-based
+                    idx + 1,
+                    id.name,
+                    total,
+                    scores
+                        .iter()
+                        .map(|(n_star, _s)| match n_star {
+                            0 => " -",
+                            1 => " □",
+                            2 => " ■",
+                            _ => unreachable!(),
+                        })
+                        .collect::<String>()
+                )
+            })
+            .join("\n")
+    }
 }
 
 impl Deref for Leaderboard {
@@ -529,5 +626,11 @@ impl ScrapedLeaderboard {
             timestamp: Utc::now(),
             leaderboard: Leaderboard::new(),
         }
+    }
+
+    pub fn merge_with(&mut self, other: ScrapedLeaderboard) {
+        self.timestamp = other.timestamp;
+        self.leaderboard
+            .extend(other.leaderboard.clone().into_iter());
     }
 }

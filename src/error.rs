@@ -1,5 +1,4 @@
-use std::error::Error;
-use std::fmt;
+use std::{error::Error, fmt};
 use tokio_cron_scheduler::JobSchedulerError;
 
 /// Custom Error and Result types to unify errors from all sources.

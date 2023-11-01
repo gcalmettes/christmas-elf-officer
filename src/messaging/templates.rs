@@ -1,6 +1,5 @@
 use minijinja::{Environment, Template};
 use once_cell::sync::Lazy;
-
 use strum::{EnumIter, IntoEnumIterator};
 use tracing::info;
 
@@ -29,6 +28,7 @@ pub enum MessageTemplate {
     NewTodayCompletions,
     NewLateCompletions,
     Ranking,
+    Leaderboard,
     Hero,
 }
 
@@ -43,6 +43,7 @@ impl MessageTemplate {
             MessageTemplate::NewLateCompletions => "late_completions.txt",
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
             MessageTemplate::Ranking => "ranking.txt",
+            MessageTemplate::Leaderboard => "leaderboard.txt",
             MessageTemplate::Hero => "hero.txt",
         }
     }
@@ -57,8 +58,9 @@ impl MessageTemplate {
         match self {
             MessageTemplate::Help => {
                 "🆘 below are the bot commands:\n\
-                    \x20   `!help`: the commands\n\
-                    \x20   `!ranking`: current ranking by local score\n\
+                 \x20 `!help`: the commands\n\
+                 \x20 `!standings [year]`: standings by local score for the current year [or specified year]\n\
+                 \x20 `!leaderboard [year]`: leaderboard state for the current year [or specified year]\n\
                 "
             },
             MessageTemplate::DailyChallenge => {
@@ -95,14 +97,26 @@ impl MessageTemplate {
                     \x20 • Delta times range: 🏃‍♀️ {{delta_fast}} - {{delta_slow}} 🚶‍♀️"
             }
             MessageTemplate::Ranking => {
-                ":first_place_medal: Current ranking as of {{timestamp}}:\n\
-                {%- for (name, score) in scores %}
-                    \x20 • {{name}} => {{score}}
+                "{% if current_year %}
+                    :first_place_medal: Current ranking as of {{timestamp}}:\n\
+                {% else %}
+                    :first_place_medal: Ranking from the {{ year }} event:\n\
+                {% endif %}
+                {%- for (name, score) in scores %}\n\
+                 • {{name}} \t {{score}}
                 {%- endfor %}"
             }
             MessageTemplate::Hero => {
                 "🎉 🥳 Our very own *{{ name }}* made it to the global leaderboard on part *{{ part }}*! (*{{ rank }}*) 🙌"
             },
+            MessageTemplate::Leaderboard => {
+                "{%- if current_year -%}
+                    📓 Current Leaderboard as of {{timestamp}}:
+                {%- else -%}
+                    📓 Learderboard from the {{ year }} event:
+                {%- endif -%}
+                ```{{ leaderboard }}```"
+            }
         }
     }
 }

@@ -2,8 +2,10 @@ use crate::aoc::leaderboard::Leaderboard;
 use chrono::Duration;
 use itertools::Itertools;
 use serde::Serialize;
-use std::cmp::Reverse;
-use std::collections::{HashMap, HashSet};
+use std::{
+    cmp::Reverse,
+    collections::{HashMap, HashSet},
+};
 
 pub fn ordinal_number_suffix(num: u8) -> &'static str {
     let s = num.to_string();

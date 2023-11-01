@@ -1,6 +1,5 @@
-use std::sync::{Arc, Mutex};
-
 use crate::aoc::leaderboard::ScrapedLeaderboard;
+use std::sync::{Arc, Mutex};
 
 type SharedLeaderboard = Arc<Mutex<ScrapedLeaderboard>>;
 

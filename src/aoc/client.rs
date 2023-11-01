@@ -1,13 +1,12 @@
+use crate::{
+    aoc::leaderboard::{Entry, Identifier, Leaderboard, ProblemPart, ScrapedLeaderboard},
+    config,
+    error::{BotError, BotResult},
+};
 use chrono::{TimeZone, Utc};
 use reqwest::{Client, StatusCode};
 use scraper::{Html, Selector};
-use std::fmt;
-
-use std::collections::HashMap;
-
-use crate::aoc::leaderboard::{Entry, Identifier, Leaderboard, ProblemPart, ScrapedLeaderboard};
-use crate::config;
-use crate::error::{BotError, BotResult};
+use std::{collections::HashMap, fmt};
 
 enum Endpoint {
     GlobalLeaderboard(i32, u8),
@@ -235,7 +234,7 @@ impl AoC {
             for (day, stars) in member.completion_day_level.iter() {
                 for (star, info) in stars.iter() {
                     let star = star.parse().map_err(|_| BotError::Parse)?;
-                    earned_stars.push(Entry {
+                    earned_stars.insert(Entry {
                         timestamp: Utc
                             .timestamp_opt(info.get_star_ts, 0)
                             .single()
@@ -252,9 +251,6 @@ impl AoC {
                 }
             }
         }
-
-        // Entries are sorted chronologically
-        earned_stars.sort_unstable();
 
         Ok(earned_stars)
     }

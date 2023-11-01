@@ -1,16 +1,15 @@
-use crate::aoc::leaderboard::{LeaderboardStatistics, ProblemPart, ScrapedLeaderboard};
-use crate::messaging::templates::MessageTemplate;
-use crate::utils::{format_duration, format_rank, DayHighlight};
+use crate::{
+    aoc::leaderboard::{LeaderboardStatistics, ProblemPart, ScrapedLeaderboard},
+    messaging::templates::MessageTemplate,
+    utils::{format_duration, format_rank, DayHighlight},
+};
+use chrono::{DateTime, Datelike, Local, Utc};
 use itertools::Itertools;
 use minijinja::context;
-use std::fmt;
-use std::iter::Iterator;
-
-use chrono::{DateTime, Local, Utc};
-
 use slack_morphism::{SlackChannelId, SlackTs};
+use std::{fmt, iter::Iterator};
 
-const COMMANDS: [&'static str; 2] = ["!help", "!ranking"];
+const COMMANDS: [&'static str; 3] = ["!help", "!standings", "!leaderboard"];
 
 #[derive(Debug)]
 pub enum Event {
@@ -26,7 +25,8 @@ pub enum Event {
 #[derive(Debug, Clone)]
 pub enum Command {
     Help,
-    GetPrivateStandingByLocalScore(Vec<(String, String)>, DateTime<Utc>),
+    GetPrivateStandingByLocalScore(i32, Vec<(String, String)>, DateTime<Utc>),
+    GetLeaderboardHistogram(i32, String, DateTime<Utc>),
 }
 
 impl Command {
@@ -36,12 +36,18 @@ impl Command {
     }
 
     pub fn build_from(input: String, leaderboard: &ScrapedLeaderboard) -> Command {
-        let start_with = input.trim().split(" ").next().unwrap();
+        let mut input = input.trim().split(" ");
+        let start_with = input.next().unwrap();
         match start_with {
             cmd if cmd == COMMANDS[0] => Command::Help,
             cmd if cmd == COMMANDS[1] => {
-                // TODO: handle year
-                let year = 2022;
+                // !ranking
+
+                let year = match input.next().and_then(|y| y.parse::<i32>().ok()) {
+                    Some(y) => y,
+                    //TODO: get current year programmatically
+                    None => 2022,
+                };
                 let data = leaderboard
                     .leaderboard
                     .standings_by_local_score_per_year()
@@ -50,18 +56,22 @@ impl Command {
                     .into_iter()
                     .map(|(m, s)| (m.clone(), s.to_string()))
                     .collect::<Vec<(String, String)>>();
-                Command::GetPrivateStandingByLocalScore(data, leaderboard.timestamp)
+                Command::GetPrivateStandingByLocalScore(year, data, leaderboard.timestamp)
+            }
+            cmd if cmd == COMMANDS[2] => {
+                // !leaderboard
+                let year = match input.next().and_then(|y| y.parse::<i32>().ok()) {
+                    Some(y) => y,
+                    //TODO: get current year programmatically
+                    None => 2022,
+                };
+
+                let formatted = leaderboard.leaderboard.show_year(year);
+                Command::GetLeaderboardHistogram(year, formatted, leaderboard.timestamp)
             }
             _ => unreachable!(),
         }
     }
-
-    // pub fn get_prefix(&self) -> &str {
-    //     match self {
-    //         Command::Help => &COMMANDS[0],
-    //         Command::GetPrivateStandingByLocalScore(..) => &COMMANDS[1],
-    //     }
-    // }
 }
 
 impl fmt::Display for Event {
@@ -116,7 +126,7 @@ impl fmt::Display for Event {
                     "{}",
                     MessageTemplate::Hero
                         .get()
-                        .render(context! { name => hero, part => part, rank => format_rank(*rank) })
+                        .render(context! { name => hero, part => part.to_string(), rank => format_rank(*rank) })
                         .unwrap()
                 )
             }
@@ -166,16 +176,29 @@ impl fmt::Display for Event {
                 Command::Help => {
                     write!(f, "{}", MessageTemplate::Help.get().render({}).unwrap())
                 }
-                Command::GetPrivateStandingByLocalScore(data, time) => {
-                    let timestamp =
-                        format!("{}", time.with_timezone(&Local).format("%d/%m/%Y %H:%M:%S"));
+                Command::GetPrivateStandingByLocalScore(year, data, time) => {
+                    let now = time.with_timezone(&Local);
+                    let timestamp = format!("{}", now.format("%d/%m/%Y %H:%M:%S"));
 
                     write!(
                         f,
                         "{}",
                         MessageTemplate::Ranking
                             .get()
-                            .render(context! { timestamp => timestamp, scores => data })
+                            .render(context! { year => year, current_year => year == &now.year(), timestamp => timestamp, scores => data })
+                            .unwrap()
+                    )
+                }
+                Command::GetLeaderboardHistogram(year, histogram, time) => {
+                    let now = time.with_timezone(&Local);
+                    let timestamp = format!("{}", now.format("%d/%m/%Y %H:%M:%S"));
+
+                    write!(
+                        f,
+                        "{}",
+                        MessageTemplate::Leaderboard
+                            .get()
+                            .render(context! { year => year, current_year => year == &now.year(), timestamp => timestamp, leaderboard => histogram })
                             .unwrap()
                     )
                 }

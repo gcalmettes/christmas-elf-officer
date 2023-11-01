@@ -3,8 +3,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::info;
 
-use messaging::client::AoCSlackClient;
-use messaging::events::Event;
+use messaging::{client::AoCSlackClient, events::Event};
 use scheduler::{JobProcess, Scheduler};
 use storage::MemoryCache;
 

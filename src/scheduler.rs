@@ -1,18 +1,16 @@
+use crate::{
+    aoc::client::AoC,
+    config,
+    error::{BotError, BotResult},
+    messaging::events::Event,
+    storage::MemoryCache,
+    utils::compute_highlights,
+};
 use chrono::{Datelike, Utc};
-use std::time::Duration;
-use tokio::sync::mpsc::Sender;
-use tokio::time;
+use std::{sync::Arc, time::Duration};
+use tokio::{sync::mpsc::Sender, time};
 use tokio_cron_scheduler::{Job, JobScheduler};
 use tracing::{error, info};
-
-use std::sync::Arc;
-
-use crate::aoc::client::AoC;
-use crate::config;
-use crate::error::{BotError, BotResult};
-use crate::messaging::events::Event;
-use crate::storage::MemoryCache;
-use crate::utils::compute_highlights;
 
 pub struct Scheduler {
     scheduler: JobScheduler,
@@ -85,16 +83,19 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
         Box::pin(async move {
             let aoc_client = AoC::new();
             //TODO: get year programmatically
-            match aoc_client.private_leaderboard(2022).await {
-                Ok(scraped_leaderboard) => {
-                    let mut data = cache.data.lock().unwrap();
-                    *data = scraped_leaderboard;
-                }
-                Err(e) => {
-                    let error = BotError::AOC(format!("Could not scrape leaderboard. {e}"));
-                    error!("{error}");
-                }
-            };
+            //let year = 2022
+            for year in 2015..=2022 {
+                match aoc_client.private_leaderboard(year).await {
+                    Ok(scraped_leaderboard) => {
+                        let mut data = cache.data.lock().unwrap();
+                        data.merge_with(scraped_leaderboard);
+                    }
+                    Err(e) => {
+                        let error = BotError::AOC(format!("Could not scrape leaderboard. {e}"));
+                        error!("{error}");
+                    }
+                };
+            }
         })
     })?;
     Ok(job)
@@ -169,12 +170,7 @@ async fn update_private_leaderboard_job(
                     // Scoped to force 'data' to drop before 'await' so future can be Send.
                     {
                         let mut data = cache.data.lock().unwrap();
-                        // TODO: Here we replace the full leaderboard, so we can only have entries
-                        // of one specific year. However, we could also just append/unique the
-                        // entries if we wanted to handle multiple years.
-                        // Leaderboard functions could all be easily adapted to filter by year.
-                        // We should change the Vec<Solution> by HashSet<Solution>
-                        *data = scraped_leaderboard;
+                        data.merge_with(scraped_leaderboard);
                     }
 
                     if let Err(e) = sender.send(Event::PrivateLeaderboardUpdated).await {

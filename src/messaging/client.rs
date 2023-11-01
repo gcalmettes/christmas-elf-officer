@@ -1,7 +1,9 @@
-use crate::config;
-use crate::error::BotError;
-use crate::messaging::events::{Command, Event};
-use crate::storage::MemoryCache;
+use crate::{
+    config,
+    error::BotError,
+    messaging::events::{Command, Event},
+    storage::MemoryCache,
+};
 use http::StatusCode;
 use slack_morphism::{
     api::SlackApiChatPostMessageRequest,
