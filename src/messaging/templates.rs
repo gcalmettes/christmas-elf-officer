@@ -25,6 +25,7 @@ pub enum MessageTemplate {
     DailySolutionThread,
     GlobalStatistics,
     PrivateLeaderboardUpdated,
+    LeaderboardMemberJoin,
     NewTodayCompletions,
     NewLateCompletions,
     Ranking,
@@ -39,6 +40,7 @@ impl MessageTemplate {
             MessageTemplate::DailyChallenge => "challenge.txt",
             MessageTemplate::DailySolutionThread => "solution_thread.txt",
             MessageTemplate::PrivateLeaderboardUpdated => "private_leaderboard_updated.txt",
+            MessageTemplate::LeaderboardMemberJoin => "private_leaderboard_new_members.txt",
             MessageTemplate::NewTodayCompletions => "today_completions.txt",
             MessageTemplate::NewLateCompletions => "late_completions.txt",
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
@@ -75,6 +77,11 @@ impl MessageTemplate {
             },
             MessageTemplate::PrivateLeaderboardUpdated => {
                 "🔁 Private Leaderboard successfully updated!"
+            },
+            MessageTemplate::LeaderboardMemberJoin => {
+                "{%- for name in members %}\n\
+                    🕺 A new player has joined the christmas arena ! Happy to have you on board *{{name}}* !
+                 {%- endfor %}"
             },
             MessageTemplate::NewTodayCompletions => {
                 "{%- for entry in completions %}\n\

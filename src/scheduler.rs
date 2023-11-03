@@ -4,7 +4,7 @@ use crate::{
     error::{BotError, BotResult},
     messaging::events::Event,
     storage::MemoryCache,
-    utils::compute_highlights,
+    utils::{compute_highlights, get_new_members},
 };
 use chrono::{Datelike, Utc};
 use std::{sync::Arc, time::Duration};
@@ -133,30 +133,35 @@ async fn update_private_leaderboard_job(
         let sender = sender.clone();
         Box::pin(async move {
             let aoc_client = AoC::new();
+
             match aoc_client.private_leaderboard(2022).await {
                 Ok(scraped_leaderboard) => {
-                    // TODO: check for new members, and if so announce it.
-                    // Message could include something like "XX has joined the battle field! now every star provide x number of
-                    // points". No worries, changes have been automatically applied to past stars.
+                    // Scoped to force 'current_leaderboard' to drop before 'await' so future can be Send.
+                    let (highlights, new_members) = {
+                        let mut current_leaderboard = cache.data.lock().unwrap();
 
-                    // TODO: check for lost members, and if so announce it ?
-                    // Message could include something like "now every star provide x number of
-                    // points".
-
-                    let new_completions = {
-                        let current_leaderboard = cache.data.lock().unwrap();
-
+                        // Check for new parts completions
                         let highlights = compute_highlights(
                             &current_leaderboard.leaderboard,
                             &scraped_leaderboard.leaderboard,
                         );
 
-                        highlights
+                        // Check for new members
+                        let new_members = get_new_members(
+                            &current_leaderboard.leaderboard,
+                            &scraped_leaderboard.leaderboard,
+                        );
+
+                        // Update leadearboard in cache.
+                        current_leaderboard.merge_with(scraped_leaderboard);
+
+                        (highlights, new_members)
                     };
 
-                    if !new_completions.is_empty() {
+                    // Conditionnally trigger internal events, base on leaderboard processing.
+                    if !new_members.is_empty() {
                         if let Err(e) = sender
-                            .send(Event::PrivateLeaderboardNewCompletions(new_completions))
+                            .send(Event::PrivateLeaderboardNewMembers(new_members))
                             .await
                         {
                             let error = BotError::ChannelSend(format!(
@@ -165,14 +170,17 @@ async fn update_private_leaderboard_job(
                             error!("{error}");
                         };
                     }
-
-                    // Save new leadearboard in cache.
-                    // Scoped to force 'data' to drop before 'await' so future can be Send.
-                    {
-                        let mut data = cache.data.lock().unwrap();
-                        data.merge_with(scraped_leaderboard);
+                    if !highlights.is_empty() {
+                        if let Err(e) = sender
+                            .send(Event::PrivateLeaderboardNewCompletions(highlights))
+                            .await
+                        {
+                            let error = BotError::ChannelSend(format!(
+                                "Could not send message to MPSC channel. {e}"
+                            ));
+                            error!("{error}");
+                        };
                     }
-
                     if let Err(e) = sender.send(Event::PrivateLeaderboardUpdated).await {
                         let error = BotError::ChannelSend(format!(
                             "Could not send message to MPSC channel. {e}"

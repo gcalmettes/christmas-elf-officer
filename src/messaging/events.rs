@@ -18,6 +18,7 @@ pub enum Event {
     DailyChallengeIsUp(String),
     PrivateLeaderboardNewCompletions(Vec<DayHighlight>),
     PrivateLeaderboardUpdated,
+    PrivateLeaderboardNewMembers(Vec<String>),
     DailySolutionsThreadToInitialize(u32),
     CommandReceived(SlackChannelId, SlackTs, Command),
 }
@@ -140,7 +141,6 @@ impl fmt::Display for Event {
                         .unwrap()
                 )
             }
-
             Event::PrivateLeaderboardNewCompletions(completions) => {
                 // TODO: get day programmatically
                 let (year, today): (i32, u8) = (2022, 9);
@@ -171,6 +171,16 @@ impl fmt::Display for Event {
                 };
 
                 write!(f, "{}", output)
+            }
+            Event::PrivateLeaderboardNewMembers(members) => {
+                write!(
+                    f,
+                    "{}",
+                    MessageTemplate::LeaderboardMemberJoin
+                        .get()
+                        .render(context! {members => members})
+                        .unwrap()
+                )
             }
             Event::CommandReceived(_channel_id, _ts, cmd) => match cmd {
                 Command::Help => {

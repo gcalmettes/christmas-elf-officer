@@ -80,11 +80,13 @@ pub fn compute_highlights(current: &Leaderboard, new: &Leaderboard) -> Vec<DayHi
                     let score_increase = new_scores
                         .get(&(*year, &id))
                         .and_then(|days| Some(days[day_index]))
+                        // we know there is a score, unwrap safely
                         .unwrap()
                         - current_scores
                             .get(&(*year, &id))
                             .and_then(|days| Some(days[day_index]))
-                            .unwrap();
+                            // if first star for new member, no previous result
+                            .unwrap_or(0);
 
                     // compute delta if any
                     let (year, day) = (year, d);
@@ -116,4 +118,10 @@ pub fn compute_highlights(current: &Leaderboard, new: &Leaderboard) -> Vec<DayHi
         .collect::<Vec<DayHighlight>>();
 
     highlights
+}
+
+pub fn get_new_members(cur: &Leaderboard, new: &Leaderboard) -> Vec<String> {
+    let cur = cur.iter().map(|e| &e.id.name).collect::<HashSet<&String>>();
+    let new = new.iter().map(|e| &e.id.name).collect::<HashSet<&String>>();
+    new.difference(&cur).map(|n| n.to_string()).collect()
 }
