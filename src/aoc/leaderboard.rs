@@ -220,11 +220,6 @@ impl Leaderboard {
         self.is_entry_count_equal_to(200)
     }
 
-    /// member => (unordered) entries
-    fn entries_per_member(&self) -> HashMap<&Identifier, Vec<&Entry>> {
-        self.iter().into_group_map_by(|a| &a.id)
-    }
-
     /// (year, member) => (unordered) stars
     fn entries_per_year_member(&self) -> HashMap<(i32, &Identifier), Vec<&Entry>> {
         self.iter().into_group_map_by(|a| (a.year, &a.id))

@@ -16,7 +16,7 @@ pub enum Event {
     GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
     GlobalLeaderboardHeroFound((String, ProblemPart, u8)),
     DailyChallengeIsUp(String),
-    PrivateLeaderboardNewCompletions(Vec<DayHighlight>),
+    PrivateLeaderboardNewEntries(Vec<DayHighlight>),
     PrivateLeaderboardUpdated,
     PrivateLeaderboardNewMembers(Vec<String>),
     DailySolutionsThreadToInitialize(u32),
@@ -141,31 +141,31 @@ impl fmt::Display for Event {
                         .unwrap()
                 )
             }
-            Event::PrivateLeaderboardNewCompletions(completions) => {
+            Event::PrivateLeaderboardNewEntries(entries) => {
                 // TODO: get day programmatically
                 let (year, today): (i32, u8) = (2022, 9);
 
-                let is_today_completions = completions
+                let is_today_entries = entries
                     .iter()
                     .into_group_map_by(|h| h.year == year && h.day == today);
 
                 let mut output = String::new();
-                if let Some(today_completions) = is_today_completions.get(&true) {
+                if let Some(today_entries) = is_today_entries.get(&true) {
                     output.push_str(
-                        &MessageTemplate::NewTodayCompletions
+                        &MessageTemplate::NewEntriesToday
                             .get()
-                            .render(context! {completions => today_completions})
+                            .render(context! {completions => today_entries})
                             .unwrap(),
                     );
                 };
-                if let Some(late_completions) = is_today_completions.get(&false) {
+                if let Some(late_entries) = is_today_entries.get(&false) {
                     if !output.is_empty() {
                         output.push_str("\n");
                     };
                     output.push_str(
-                        &MessageTemplate::NewLateCompletions
+                        &MessageTemplate::NewEntriesLate
                             .get()
-                            .render(context! {completions => late_completions})
+                            .render(context! {completions => late_entries})
                             .unwrap(),
                     );
                 };

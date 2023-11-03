@@ -172,7 +172,7 @@ async fn update_private_leaderboard_job(
                     }
                     if !highlights.is_empty() {
                         if let Err(e) = sender
-                            .send(Event::PrivateLeaderboardNewCompletions(highlights))
+                            .send(Event::PrivateLeaderboardNewEntries(highlights))
                             .await
                         {
                             let error = BotError::ChannelSend(format!(

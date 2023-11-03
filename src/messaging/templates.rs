@@ -26,8 +26,8 @@ pub enum MessageTemplate {
     GlobalStatistics,
     PrivateLeaderboardUpdated,
     LeaderboardMemberJoin,
-    NewTodayCompletions,
-    NewLateCompletions,
+    NewEntriesToday,
+    NewEntriesLate,
     Ranking,
     Leaderboard,
     Hero,
@@ -41,8 +41,8 @@ impl MessageTemplate {
             MessageTemplate::DailySolutionThread => "solution_thread.txt",
             MessageTemplate::PrivateLeaderboardUpdated => "private_leaderboard_updated.txt",
             MessageTemplate::LeaderboardMemberJoin => "private_leaderboard_new_members.txt",
-            MessageTemplate::NewTodayCompletions => "today_completions.txt",
-            MessageTemplate::NewLateCompletions => "late_completions.txt",
+            MessageTemplate::NewEntriesToday => "today_entries.txt",
+            MessageTemplate::NewEntriesLate => "late_entries.txt",
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
             MessageTemplate::Ranking => "ranking.txt",
             MessageTemplate::Leaderboard => "leaderboard.txt",
@@ -83,14 +83,14 @@ impl MessageTemplate {
                     🕺 A new player has joined the christmas arena ! Happy to have you on board *{{name}}* !
                  {%- endfor %}"
             },
-            MessageTemplate::NewTodayCompletions => {
+            MessageTemplate::NewEntriesToday => {
                 "{%- for entry in completions %}\n\
                     {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
                     📣 {{entry.name}} just earned *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} {{ ['(day', entry.day, double, 'completed!)']|join(' ')  if both else ['for day', entry.day, single]|join(' ') }} +{{entry.new_points}}pts
                     {%- endwith %}
                  {%- endfor %}\n"
             },
-            MessageTemplate::NewLateCompletions => {
+            MessageTemplate::NewEntriesLate => {
                 "{%- for entry in completions %}\n\
                     {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
                     🚂  {{entry.name}} just catched up on *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }}) +{{entry.new_points}}pts
@@ -98,7 +98,7 @@ impl MessageTemplate {
                  {%- endfor %}"
             },
             MessageTemplate::GlobalStatistics => {
-                "📣 🌍 Global Leaderboard is complete for *day {{day}}*! Here is how it went for the big dogs:\n\
+                "🌍 Global Leaderboard is complete for *day {{day}}*! Here is how it went for the big dogs:\n\
                     \x20 • Part 1 finish time range: 🔥 *{{p1_fast}}* - *{{p1_slow}}* ❄️\n\
                     \x20 • Part 2 finish time range: 🔥 *{{p2_fast}}* - *{{p2_slow}}* ❄️\n\
                     \x20 • Delta times range: 🏃‍♀️ {{delta_fast}} - {{delta_slow}} 🚶‍♀️"
