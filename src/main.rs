@@ -9,6 +9,7 @@ use storage::MemoryCache;
 
 pub mod aoc;
 pub mod config;
+pub mod cli;
 pub mod error;
 pub mod messaging;
 pub mod scheduler;

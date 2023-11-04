@@ -82,9 +82,18 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
         let cache = cache.clone();
         Box::pin(async move {
             let aoc_client = AoC::new();
+            let settings = &config::SETTINGS;
+
             //TODO: get year programmatically
-            //let year = 2022
-            for year in 2015..=2022 {
+            let current_year = 2022;
+            let mut live_years = vec![current_year];
+            if settings.all_years {
+                live_years.extend(2015..current_year)
+            };
+
+            println!(">>> {:?}", live_years);
+
+            for year in live_years {
                 match aoc_client.private_leaderboard(year).await {
                     Ok(scraped_leaderboard) => {
                         let mut data = cache.data.lock().unwrap();

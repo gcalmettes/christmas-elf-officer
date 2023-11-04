@@ -1,5 +1,7 @@
+use crate::cli::Cli;
+use clap::Parser;
 use figment::{
-    providers::{Env, Format, Yaml},
+    providers::{Env, Format, Serialized, Yaml},
     Figment,
 };
 use once_cell::sync::Lazy;
@@ -37,6 +39,10 @@ fn default_aoc_base_url() -> String {
     "https://adventofcode.com".to_string()
 }
 
+fn default_all_years() -> bool {
+    false
+}
+
 // Settings are a singleton generated at runtime. All settings may be
 // configured via environment variables. Example:
 // SLACK_TOKEN="xxx" would set slack_token to the xxx value.
@@ -58,6 +64,9 @@ pub struct Settings {
     pub aoc_api_timeout_sec: u64,
     pub aoc_private_leaderboard_id: u64,
     pub aoc_session_cookie: String,
+    // Whether to load the private leaderboard for all the previous AOC events
+    #[serde(default = "default_all_years")]
+    pub all_years: bool,
 }
 
 impl Settings {
@@ -75,11 +84,13 @@ impl Settings {
                 Figment::new()
                     .merge(Yaml::file(local_settings_yaml_file))
                     .merge(Env::raw())
+                    .merge(Serialized::defaults(Cli::parse()))
                     .extract()
                     .unwrap()
             }
             false => Figment::new().merge(Env::raw()).extract().unwrap(),
         };
+
         settings
     }
 
