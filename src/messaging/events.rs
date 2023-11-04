@@ -1,7 +1,7 @@
 use crate::{
     aoc::leaderboard::{LeaderboardStatistics, ProblemPart, ScrapedLeaderboard},
     messaging::templates::MessageTemplate,
-    utils::{format_duration, format_rank, DayHighlight},
+    utils::{current_year_day, format_duration, format_rank, DayHighlight},
 };
 use chrono::{DateTime, Datelike, Local, Utc};
 use itertools::Itertools;
@@ -43,12 +43,11 @@ impl Command {
             cmd if cmd == COMMANDS[0] => Command::Help,
             cmd if cmd == COMMANDS[1] => {
                 // !ranking
+                let year = input
+                    .next()
+                    .and_then(|y| y.parse::<i32>().ok())
+                    .unwrap_or_else(|| current_year_day().0);
 
-                let year = match input.next().and_then(|y| y.parse::<i32>().ok()) {
-                    Some(y) => y,
-                    //TODO: get current year programmatically
-                    None => 2022,
-                };
                 let data = leaderboard
                     .leaderboard
                     .standings_by_local_score_per_year()
@@ -61,11 +60,10 @@ impl Command {
             }
             cmd if cmd == COMMANDS[2] => {
                 // !leaderboard
-                let year = match input.next().and_then(|y| y.parse::<i32>().ok()) {
-                    Some(y) => y,
-                    //TODO: get current year programmatically
-                    None => 2022,
-                };
+                let year = input
+                    .next()
+                    .and_then(|y| y.parse::<i32>().ok())
+                    .unwrap_or_else(|| current_year_day().0);
 
                 let formatted = leaderboard.leaderboard.show_year(year);
                 Command::GetLeaderboardHistogram(year, formatted, leaderboard.timestamp)
@@ -142,8 +140,7 @@ impl fmt::Display for Event {
                 )
             }
             Event::PrivateLeaderboardNewEntries(entries) => {
-                // TODO: get day programmatically
-                let (year, today): (i32, u8) = (2022, 9);
+                let (year, today) = current_year_day();
 
                 let is_today_entries = entries
                     .iter()

@@ -4,7 +4,7 @@ use crate::{
     error::{BotError, BotResult},
     messaging::events::Event,
     storage::MemoryCache,
-    utils::{compute_highlights, get_new_members},
+    utils::{compute_highlights, current_year_day, get_new_members},
 };
 use chrono::{Datelike, Utc};
 use std::{sync::Arc, time::Duration};
@@ -84,14 +84,11 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
             let aoc_client = AoC::new();
             let settings = &config::SETTINGS;
 
-            //TODO: get year programmatically
-            let current_year = 2022;
+            let (current_year, _day) = current_year_day();
             let mut live_years = vec![current_year];
             if settings.all_years {
                 live_years.extend(2015..current_year)
             };
-
-            println!(">>> {:?}", live_years);
 
             for year in live_years {
                 match aoc_client.private_leaderboard(year).await {
@@ -143,7 +140,8 @@ async fn update_private_leaderboard_job(
         Box::pin(async move {
             let aoc_client = AoC::new();
 
-            match aoc_client.private_leaderboard(2022).await {
+            let (year, _day) = current_year_day();
+            match aoc_client.private_leaderboard(year).await {
                 Ok(scraped_leaderboard) => {
                     // Scoped to force 'current_leaderboard' to drop before 'await' so future can be Send.
                     let (highlights, new_members) = {
@@ -231,13 +229,7 @@ async fn watch_global_leaderboard_job(
                 settings.global_leaderboard_polling_interval_sec,
             ));
 
-            //TODO: Set year and day programmatically from Utc::now()
-
-            // let now = Utc::now();
-            // let year = now.year();
-            // let day = now.day() as u8;
-
-            let (year, day) = (2022, 9);
+            let (year, day) = current_year_day();
 
             // let mut known_hero_hits: Vec<(&String, ProblemPart, u8)> = vec![];
             let mut known_hero_hashes: Vec<String> = vec![];
@@ -332,13 +324,7 @@ async fn parse_daily_challenge_job(schedule: &str, sender: Arc<Sender<Event>>) -
         Box::pin(async move {
             let aoc_client = AoC::new();
 
-            //TODO: Set year and day programmatically from Utc::now()
-
-            // let now = Utc::now();
-            // let year = now.year();
-            // let day = now.day() as u8;
-
-            let (year, day) = (2022, 9);
+            let (year, day) = current_year_day();
 
             info!("Retrieving challenge title for day {day}.");
 

@@ -1,5 +1,5 @@
-use crate::aoc::leaderboard::Leaderboard;
-use chrono::Duration;
+use crate::aoc::leaderboard::{Entry, Leaderboard};
+use chrono::{Datelike, Duration, Utc};
 use itertools::Itertools;
 use serde::Serialize;
 use std::{
@@ -22,6 +22,27 @@ pub fn ordinal_number_suffix(num: u8) -> &'static str {
 
 pub fn format_rank(rank: u8) -> String {
     format!("{}{}", rank, ordinal_number_suffix(rank))
+}
+
+pub fn current_year_day() -> (i32, u8) {
+    let now = Utc::now();
+    let year = now.year();
+
+    // We start taking the current year into account 10 days before the first puzzle unlocks.
+    let start_aoc_period = Entry::puzzle_unlock(year, 1)
+        .ok()
+        // if something wrong happen in the parsing, we won't take the current year into account
+        .map_or_else(|| now + Duration::minutes(10), |t| t - Duration::days(10));
+
+    let _year = match start_aoc_period <= now {
+        true => year,
+        false => year - 1,
+    };
+    let _day = now.day() as u8;
+    // (year, day)
+
+    // TODO: remove fixed (year, day) used for dev purpose
+    (2022, 9)
 }
 
 pub fn format_duration(duration: Duration) -> String {
