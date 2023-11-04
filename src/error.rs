@@ -17,10 +17,6 @@ pub enum BotError {
     Parse,
 }
 
-pub fn convert_err(e: reqwest::Error) -> std::io::Error {
-    std::io::Error::new(std::io::ErrorKind::Other, e)
-}
-
 impl fmt::Display for BotError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -55,4 +51,8 @@ impl From<JobSchedulerError> for BotError {
     fn from(error: JobSchedulerError) -> Self {
         BotError::Scheduler(error.to_string())
     }
+}
+
+pub fn convert_err(e: reqwest::Error) -> std::io::Error {
+    std::io::Error::new(std::io::ErrorKind::Other, e)
 }

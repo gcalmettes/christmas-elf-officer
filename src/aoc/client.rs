@@ -52,6 +52,30 @@ impl AoC {
         }
     }
 
+    pub async fn global_leaderboard(&self, year: i32, day: u8) -> BotResult<ScrapedLeaderboard> {
+        let leaderboard_response = self.get_global_leaderboard(year, day).await?;
+        let leaderboard = AoC::parse_global_leaderboard(&leaderboard_response, year, day)?;
+        Ok(ScrapedLeaderboard {
+            timestamp: Utc::now(),
+            leaderboard,
+        })
+    }
+
+    pub async fn private_leaderboard(&self, year: i32) -> BotResult<ScrapedLeaderboard> {
+        let leaderboard_response = self.get_private_leaderboard(year).await?;
+        let leaderboard = AoC::parse_private_leaderboard(&leaderboard_response)?;
+        Ok(ScrapedLeaderboard {
+            timestamp: Utc::now(),
+            leaderboard,
+        })
+    }
+
+    pub async fn daily_challenge(&self, year: i32, day: u8) -> BotResult<String> {
+        let daily_challenge = self.get_daily_challenge(year, day).await?;
+        let title = AoC::parse_daily_challenge_title(&daily_challenge)?;
+        Ok(title)
+    }
+
     async fn get(&self, endpoint: &Endpoint, session_cookie: Option<String>) -> BotResult<String> {
         let url = format!("{}{}", self.base_url, endpoint);
 
@@ -79,41 +103,18 @@ impl AoC {
         Ok(resp)
     }
 
-    pub async fn global_leaderboard(&self, year: i32, day: u8) -> BotResult<ScrapedLeaderboard> {
-        let leaderboard_response = self.get_global_leaderboard(year, day).await?;
-        let leaderboard = AoC::parse_global_leaderboard(&leaderboard_response, year, day)?;
-        Ok(ScrapedLeaderboard {
-            timestamp: Utc::now(),
-            leaderboard,
-        })
-    }
-
     async fn get_daily_challenge(&self, year: i32, day: u8) -> BotResult<String> {
         let endpoint = Endpoint::DailyChallenge(year, day);
         let resp = self.get(&endpoint, None).await?;
         Ok(resp)
     }
 
-    pub async fn daily_challenge(&self, year: i32, day: u8) -> BotResult<String> {
-        let daily_challenge = self.get_daily_challenge(year, day).await?;
-        let title = AoC::parse_daily_challenge_title(&daily_challenge)?;
-        Ok(title)
-    }
     async fn get_private_leaderboard(&self, year: i32) -> BotResult<String> {
         let endpoint = Endpoint::PrivateLeaderboard(year, self.private_leaderboard_id);
         let resp = self
             .get(&endpoint, Some(self.session_cookie.clone()))
             .await?;
         Ok(resp)
-    }
-
-    pub async fn private_leaderboard(&self, year: i32) -> BotResult<ScrapedLeaderboard> {
-        let leaderboard_response = self.get_private_leaderboard(year).await?;
-        let leaderboard = AoC::parse_private_leaderboard(&leaderboard_response)?;
-        Ok(ScrapedLeaderboard {
-            timestamp: Utc::now(),
-            leaderboard,
-        })
     }
 
     fn parse_daily_challenge_title(challenge: &str) -> BotResult<String> {

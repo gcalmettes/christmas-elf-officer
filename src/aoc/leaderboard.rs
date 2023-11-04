@@ -210,19 +210,10 @@ impl Leaderboard {
         Leaderboard(Entries::new())
     }
 
-    fn is_entry_count_equal_to(&self, n: usize) -> bool {
-        self.len() == n
-    }
-
     pub fn is_global_complete(&self) -> bool {
         // 100 entries for each part, so completion of global leaderboard
         // for a specific day is 2*100
         self.is_entry_count_equal_to(200)
-    }
-
-    /// (year, member) => (unordered) stars
-    fn entries_per_year_member(&self) -> HashMap<(i32, &Identifier), Vec<&Entry>> {
-        self.iter().into_group_map_by(|a| (a.year, &a.id))
     }
 
     /// (year, day, member) => (unordered) stars
@@ -234,16 +225,6 @@ impl Leaderboard {
         self.iter()
             .filter(|s| s.year == year && s.day == day)
             .into_group_map_by(|e| (e.year, e.day, &e.id))
-    }
-
-    /// (year, day, part) => (unordered) stars
-    fn entries_per_year_day_part(&self) -> HashMap<(i32, u8, ProblemPart), Vec<&Entry>> {
-        self.iter().into_group_map_by(|a| (a.year, a.day, a.part))
-    }
-
-    /// all members ids
-    fn members_ids(&self) -> HashSet<u64> {
-        self.iter().map(|e| e.id.numeric).collect()
     }
 
     /// (year, id) => [score per day for that year]
@@ -305,60 +286,11 @@ impl Leaderboard {
         )
     }
 
-    fn local_scores_per_year_member(&self) -> HashMap<(i32, &Identifier), usize> {
-        self.daily_scores_per_year_member()
-            .iter()
-            .map(|((year, id), daily_scores)| ((*year, *id), daily_scores.iter().sum()))
-            .collect()
-    }
-
     pub fn get_members_entries_union_with(&self, other: &Leaderboard) -> Vec<&Entry> {
         let other_members_ids = other.members_ids();
         self.iter()
             .filter(|entry| other_members_ids.contains(&entry.id.numeric))
             .collect::<Vec<&Entry>>()
-    }
-
-    /// (year, day, part) => [ordered members]
-    fn ranked_members_per_year_day_part(
-        &self,
-    ) -> HashMap<(i32, u8, ProblemPart), Vec<&Identifier>> {
-        self.entries_per_year_day_part()
-            .into_iter()
-            .map(|(challenge, entries)| {
-                (
-                    challenge,
-                    entries
-                        .into_iter()
-                        // sort solutions chronologically by timestamp
-                        .sorted_unstable()
-                        // retrieve author of the solution
-                        .map(|s| &s.id)
-                        .collect(),
-                )
-            })
-            .collect::<HashMap<(i32, u8, ProblemPart), Vec<&Identifier>>>()
-    }
-
-    fn min_max_times_for_year_day(
-        &self,
-        year: i32,
-        day: u8,
-    ) -> HashMap<ProblemPart, (DateTime<Utc>, DateTime<Utc>)> {
-        // Compute max time for each part, in order to infer deltas for members who only scored
-        // one part of the global leaderboard that day.
-        self.iter()
-            .filter(|s| s.year == year && s.day == day)
-            .into_group_map_by(|s| s.part)
-            .iter()
-            .map(
-                |(p, solutions)| match solutions.iter().minmax_by_key(|s| s.timestamp) {
-                    MinMaxResult::OneElement(s) => (*p, (s.timestamp, s.timestamp)),
-                    MinMaxResult::MinMax(s1, s2) => (*p, (s1.timestamp, s2.timestamp)),
-                    MinMaxResult::NoElements => unreachable!(),
-                },
-            )
-            .collect::<HashMap<ProblemPart, (DateTime<Utc>, DateTime<Utc>)>>()
     }
 
     /// year => ordered vec of (name, score)
@@ -579,6 +511,74 @@ impl Leaderboard {
                 )
             })
             .join("\n")
+    }
+
+    fn is_entry_count_equal_to(&self, n: usize) -> bool {
+        self.len() == n
+    }
+
+    /// (year, member) => (unordered) stars
+    fn entries_per_year_member(&self) -> HashMap<(i32, &Identifier), Vec<&Entry>> {
+        self.iter().into_group_map_by(|a| (a.year, &a.id))
+    }
+
+    /// (year, day, part) => (unordered) stars
+    fn entries_per_year_day_part(&self) -> HashMap<(i32, u8, ProblemPart), Vec<&Entry>> {
+        self.iter().into_group_map_by(|a| (a.year, a.day, a.part))
+    }
+
+    /// all members ids
+    fn members_ids(&self) -> HashSet<u64> {
+        self.iter().map(|e| e.id.numeric).collect()
+    }
+
+    fn local_scores_per_year_member(&self) -> HashMap<(i32, &Identifier), usize> {
+        self.daily_scores_per_year_member()
+            .iter()
+            .map(|((year, id), daily_scores)| ((*year, *id), daily_scores.iter().sum()))
+            .collect()
+    }
+
+    /// (year, day, part) => [ordered members]
+    fn ranked_members_per_year_day_part(
+        &self,
+    ) -> HashMap<(i32, u8, ProblemPart), Vec<&Identifier>> {
+        self.entries_per_year_day_part()
+            .into_iter()
+            .map(|(challenge, entries)| {
+                (
+                    challenge,
+                    entries
+                        .into_iter()
+                        // sort solutions chronologically by timestamp
+                        .sorted_unstable()
+                        // retrieve author of the solution
+                        .map(|s| &s.id)
+                        .collect(),
+                )
+            })
+            .collect::<HashMap<(i32, u8, ProblemPart), Vec<&Identifier>>>()
+    }
+
+    fn min_max_times_for_year_day(
+        &self,
+        year: i32,
+        day: u8,
+    ) -> HashMap<ProblemPart, (DateTime<Utc>, DateTime<Utc>)> {
+        // Compute max time for each part, in order to infer deltas for members who only scored
+        // one part of the global leaderboard that day.
+        self.iter()
+            .filter(|s| s.year == year && s.day == day)
+            .into_group_map_by(|s| s.part)
+            .iter()
+            .map(
+                |(p, solutions)| match solutions.iter().minmax_by_key(|s| s.timestamp) {
+                    MinMaxResult::OneElement(s) => (*p, (s.timestamp, s.timestamp)),
+                    MinMaxResult::MinMax(s1, s2) => (*p, (s1.timestamp, s2.timestamp)),
+                    MinMaxResult::NoElements => unreachable!(),
+                },
+            )
+            .collect::<HashMap<ProblemPart, (DateTime<Utc>, DateTime<Utc>)>>()
     }
 }
 

@@ -1,7 +1,9 @@
 use clap::Parser;
-use serde::{Serialize};
+use serde::Serialize;
 
-fn is_false(b: &bool) -> bool { !b }
+fn is_false(b: &bool) -> bool {
+    !b
+}
 
 #[derive(Debug, Parser, Serialize)]
 pub struct Cli {

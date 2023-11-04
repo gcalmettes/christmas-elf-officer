@@ -63,14 +63,14 @@ impl Scheduler {
         Ok(self.scheduler.start().await?)
     }
 
-    pub fn cache_size(&self) -> usize {
-        let data = self.cache.data.lock().unwrap();
-        data.leaderboard.len()
-    }
+    // pub fn cache_size(&self) -> usize {
+    //     let data = self.cache.data.lock().unwrap();
+    //     data.leaderboard.len()
+    // }
 
-    pub fn ref_count(&self) -> usize {
-        Arc::strong_count(&self.cache.data)
-    }
+    // pub fn ref_count(&self) -> usize {
+    //     Arc::strong_count(&self.cache.data)
+    // }
 }
 
 //////////////////
