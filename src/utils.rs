@@ -73,7 +73,7 @@ pub fn compute_highlights(current: &Leaderboard, new: &Leaderboard) -> Vec<DayHi
 
     new_entries.iter().for_each(|e| {
         target_days_per_member
-            .entry((e.year, e.id.clone()))
+            .entry((e.year, &e.id))
             .or_insert(vec![])
             .push(e.day);
         target_year_day_combinations.insert((e.year, e.day));

@@ -54,7 +54,7 @@ impl Command {
                     .get(&year)
                     .unwrap_or(&vec![])
                     .into_iter()
-                    .map(|(m, s)| (m.clone(), s.to_string()))
+                    .map(|(m, s)| (m.to_string(), s.to_string()))
                     .collect::<Vec<(String, String)>>();
                 Command::GetPrivateStandingByLocalScore(year, data, leaderboard.timestamp)
             }

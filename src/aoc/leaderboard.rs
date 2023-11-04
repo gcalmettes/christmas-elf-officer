@@ -294,14 +294,14 @@ impl Leaderboard {
     }
 
     /// year => ordered vec of (name, score)
-    pub fn standings_by_local_score_per_year(&self) -> HashMap<i32, Vec<(String, usize)>> {
+    pub fn standings_by_local_score_per_year(&self) -> HashMap<i32, Vec<(&String, usize)>> {
         let scores = self.local_scores_per_year_member();
 
         scores
             .into_iter()
             .into_grouping_map_by(|((year, _id), _score)| *year)
             .fold(vec![], |mut acc, _key, ((_year, id), score)| {
-                acc.push((id.name.clone(), score));
+                acc.push((&id.name, score));
                 acc
             })
             .into_iter()
@@ -314,18 +314,18 @@ impl Leaderboard {
                         .collect_vec(),
                 )
             })
-            .collect::<HashMap<i32, Vec<(String, usize)>>>()
+            .collect::<HashMap<i32, Vec<(&String, usize)>>>()
     }
 
     /// year => ordered vec of (name, number of stars)
-    pub fn standings_by_number_of_stars_per_year(&self) -> HashMap<i32, Vec<(String, usize)>> {
+    pub fn standings_by_number_of_stars_per_year(&self) -> HashMap<i32, Vec<(&String, usize)>> {
         let stars = self.entries_per_year_member();
 
         stars
             .into_iter()
             .into_grouping_map_by(|((year, _id), _stars)| *year)
             .fold(vec![], |mut acc, _key, ((_year, id), stars)| {
-                acc.push((id.name.clone(), stars.len()));
+                acc.push((&id.name, stars.len()));
                 acc
             })
             .into_iter()
@@ -338,7 +338,7 @@ impl Leaderboard {
                         .collect_vec(),
                 )
             })
-            .collect::<HashMap<i32, Vec<(String, usize)>>>()
+            .collect::<HashMap<i32, Vec<(&String, usize)>>>()
     }
 
     /// ordered vec of (name, local score)
@@ -346,14 +346,14 @@ impl Leaderboard {
         &self,
         year: i32,
         day: usize,
-    ) -> Vec<(String, usize)> {
+    ) -> Vec<(&String, usize)> {
         self.daily_scores_per_year_member()
             .iter()
             .filter(|((y, _id), _daily_scores)| y == &year)
-            .map(|((_year, id), daily_scores)| (id.name.clone(), daily_scores[day - 1]))
+            .map(|((_year, id), daily_scores)| (&id.name, daily_scores[day - 1]))
             .filter(|(_, score)| *score > 0)
             .sorted_by_key(|m| Reverse(m.1))
-            .collect::<Vec<(String, usize)>>()
+            .collect::<Vec<(&String, usize)>>()
     }
 
     /// ordered vec of (name, duration, final rank)
@@ -361,7 +361,7 @@ impl Leaderboard {
         &self,
         year: i32,
         day: u8,
-    ) -> BotResult<Vec<(String, Duration, Option<u8>)>> {
+    ) -> BotResult<Vec<(&String, Duration, Option<u8>)>> {
         // We will use max time of part 1 to infer deltas for members who only scored
         // the second part on that day.
         let max_time_first_part = self
@@ -386,7 +386,7 @@ impl Leaderboard {
                                 // Overtimed on first part, but came back strong to score second part
                                 // Duration is > (part.1, - max first part). We'll substract 1 sec.
                                 Some((
-                                    id.name.clone(),
+                                    &id.name,
                                     entry.timestamp - max_time_first_part - Duration::seconds(1),
                                     entry.rank,
                                 ))
@@ -399,17 +399,13 @@ impl Leaderboard {
                         // safe unwrap since len == 2
                         let (first, second) =
                             (ordered_parts.next().unwrap(), ordered_parts.next().unwrap());
-                        Some((
-                            id.name.clone(),
-                            second.timestamp - first.timestamp,
-                            second.rank,
-                        ))
+                        Some((&id.name, second.timestamp - first.timestamp, second.rank))
                     }
                     _ => unreachable!(),
                 },
             )
             .sorted_by_key(|r| r.1)
-            .collect::<Vec<(String, Duration, Option<u8>)>>();
+            .collect::<Vec<(&String, Duration, Option<u8>)>>();
         Ok(standings)
     }
 
