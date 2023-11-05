@@ -98,7 +98,7 @@ pub fn standings_by_number_of_stars(
         .collect()
 }
 
-fn compute_green_jersey_kpis(
+fn compute_green_jersey_duration(
     daily_entries: &Vec<&Entry>,
     challenges_min_max_time: &HashMap<(u8, ProblemPart), (DateTime<Utc>, DateTime<Utc>)>,
 ) -> Option<Duration> {
@@ -130,7 +130,7 @@ fn compute_green_jersey_kpis(
     }
 }
 
-fn compute_yellow_jersey_kpis(daily_entries: &Vec<&Entry>) -> Option<Duration> {
+fn compute_yellow_jersey_duration(daily_entries: &Vec<&Entry>) -> Option<Duration> {
     match daily_entries.len() {
         1 => None,
         2 => {
@@ -145,7 +145,7 @@ fn compute_yellow_jersey_kpis(daily_entries: &Vec<&Entry>) -> Option<Duration> {
     }
 }
 
-/// ordered vec of (id, total duration, penalties)
+/// ordered vec of (id, total duration, days over the cut off)
 pub fn standings_tdf<'a, 'b>(
     jersey: &'b Jersey,
     leaderboard: &'a Leaderboard,
@@ -160,15 +160,15 @@ pub fn standings_tdf<'a, 'b>(
         Jersey::YELLOW => None,
     };
 
-    let (delta_sum_per_member, max_n_days) = leaderboard
+    let (duration_sum_per_member, max_n_days) = leaderboard
         .iter()
         .filter(|s| s.year == year)
         .into_group_map_by(|s| (&s.id, s.day))
         .into_iter()
         .filter_map(|((id, _day), entries_for_day)| match jersey {
-            Jersey::YELLOW => compute_yellow_jersey_kpis(&entries_for_day)
+            Jersey::YELLOW => compute_yellow_jersey_duration(&entries_for_day)
                 .and_then(|duration| Some((id, duration))),
-            Jersey::GREEN => compute_green_jersey_kpis(
+            Jersey::GREEN => compute_green_jersey_duration(
                 &entries_for_day,
                 challenges_min_max_time.as_ref().unwrap(),
             )
@@ -193,16 +193,16 @@ pub fn standings_tdf<'a, 'b>(
             acc
         });
 
-    let standings = delta_sum_per_member
+    let standings = duration_sum_per_member
         .iter()
         .map(|(id, (total_duration, finished_days))| {
-            let n_penalties = max_n_days - finished_days;
-            match n_penalties {
-                0 => (*id, *total_duration, n_penalties),
+            let days_over_cutoff = max_n_days - finished_days;
+            match days_over_cutoff {
+                0 => (*id, *total_duration, days_over_cutoff),
                 diff => {
                     // penalty for every challenge not completed
                     let total_duration = total_duration + diff * (*PENALTY_UNFINISHED_DAY);
-                    (*id, total_duration, n_penalties)
+                    (*id, total_duration, days_over_cutoff)
                 }
             }
         })
