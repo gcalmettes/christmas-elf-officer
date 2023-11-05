@@ -8,8 +8,8 @@ use scheduler::{JobProcess, Scheduler};
 use storage::MemoryCache;
 
 pub mod aoc;
-pub mod config;
 pub mod cli;
+pub mod config;
 pub mod error;
 pub mod messaging;
 pub mod scheduler;
@@ -49,11 +49,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let jobs = vec![
         JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
-        // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
-        JobProcess::UpdatePrivateLeaderboard("1/10 * * * * *"),
-        // JobProcess::InitializeDailySolutionsThread("1/15 * * * * *"),
-        JobProcess::WatchGlobalLeaderboard("1/30 * * * * *"),
-        // JobProcess::ParseDailyChallenge("1/20 * * * * *"),
+                                                  // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
+                                                  // JobProcess::UpdatePrivateLeaderboard("1/10 * * * * *"),
+                                                  // JobProcess::InitializeDailySolutionsThread("1/15 * * * * *"),
+                                                  // JobProcess::WatchGlobalLeaderboard("1/30 * * * * *"),
+                                                  // JobProcess::ParseDailyChallenge("1/20 * * * * *"),
     ];
     for job in jobs {
         sched.add_job(job).await?;

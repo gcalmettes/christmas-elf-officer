@@ -293,69 +293,6 @@ impl Leaderboard {
             .collect::<Vec<&Entry>>()
     }
 
-    /// year => ordered vec of (name, score)
-    pub fn standings_by_local_score_per_year(&self) -> HashMap<i32, Vec<(&String, usize)>> {
-        let scores = self.local_scores_per_year_member();
-
-        scores
-            .into_iter()
-            .into_grouping_map_by(|((year, _id), _score)| *year)
-            .fold(vec![], |mut acc, _key, ((_year, id), score)| {
-                acc.push((&id.name, score));
-                acc
-            })
-            .into_iter()
-            .map(|(year, scores)| {
-                (
-                    year,
-                    scores
-                        .into_iter()
-                        .sorted_by_key(|x| Reverse(x.1))
-                        .collect_vec(),
-                )
-            })
-            .collect::<HashMap<i32, Vec<(&String, usize)>>>()
-    }
-
-    /// year => ordered vec of (name, number of stars)
-    pub fn standings_by_number_of_stars_per_year(&self) -> HashMap<i32, Vec<(&String, usize)>> {
-        let stars = self.entries_per_year_member();
-
-        stars
-            .into_iter()
-            .into_grouping_map_by(|((year, _id), _stars)| *year)
-            .fold(vec![], |mut acc, _key, ((_year, id), stars)| {
-                acc.push((&id.name, stars.len()));
-                acc
-            })
-            .into_iter()
-            .map(|(year, stars)| {
-                (
-                    year,
-                    stars
-                        .into_iter()
-                        .sorted_by_key(|x| Reverse(x.1))
-                        .collect_vec(),
-                )
-            })
-            .collect::<HashMap<i32, Vec<(&String, usize)>>>()
-    }
-
-    /// ordered vec of (name, local score)
-    pub fn standings_by_local_score_for_year_day(
-        &self,
-        year: i32,
-        day: usize,
-    ) -> Vec<(&String, usize)> {
-        self.daily_scores_per_year_member()
-            .iter()
-            .filter(|((y, _id), _daily_scores)| y == &year)
-            .map(|((_year, id), daily_scores)| (&id.name, daily_scores[day - 1]))
-            .filter(|(_, score)| *score > 0)
-            .sorted_by_key(|m| Reverse(m.1))
-            .collect::<Vec<(&String, usize)>>()
-    }
-
     /// ordered vec of (name, duration, final rank)
     pub fn standings_by_delta_for_year_day(
         &self,
@@ -528,13 +465,6 @@ impl Leaderboard {
         self.iter().map(|e| e.id.numeric).collect()
     }
 
-    fn local_scores_per_year_member(&self) -> HashMap<(i32, &Identifier), usize> {
-        self.daily_scores_per_year_member()
-            .iter()
-            .map(|((year, id), daily_scores)| ((*year, *id), daily_scores.iter().sum()))
-            .collect()
-    }
-
     /// (year, day, part) => [ordered members]
     fn ranked_members_per_year_day_part(
         &self,
@@ -576,6 +506,26 @@ impl Leaderboard {
             )
             .collect::<HashMap<ProblemPart, (DateTime<Utc>, DateTime<Utc>)>>()
     }
+
+    pub fn parts_min_max_times_for_year(
+        &self,
+        year: i32,
+    ) -> HashMap<(u8, ProblemPart), (DateTime<Utc>, DateTime<Utc>)> {
+        // Compute max time for each part, in order to infer deltas for members who only scored
+        // one part of the global leaderboard that day.
+        self.iter()
+            .filter(|s| s.year == year)
+            .into_group_map_by(|s| (s.day, s.part))
+            .into_iter()
+            .map(
+                |(chal, entries)| match entries.iter().minmax_by_key(|s| s.timestamp) {
+                    MinMaxResult::OneElement(s) => (chal, (s.timestamp, s.timestamp)),
+                    MinMaxResult::MinMax(s1, s2) => (chal, (s1.timestamp, s2.timestamp)),
+                    MinMaxResult::NoElements => unreachable!(),
+                },
+            )
+            .collect()
+    }
 }
 
 impl Deref for Leaderboard {
@@ -602,6 +552,7 @@ impl ScrapedLeaderboard {
 
     pub fn merge_with(&mut self, other: ScrapedLeaderboard) {
         self.timestamp = other.timestamp;
+        // Cloning the leaderboard is expensive, but this operation is only done every 15min
         self.leaderboard
             .extend(other.leaderboard.clone().into_iter());
     }

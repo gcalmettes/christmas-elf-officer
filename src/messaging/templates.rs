@@ -28,6 +28,7 @@ pub enum MessageTemplate {
     LeaderboardMemberJoin,
     NewEntriesToday,
     NewEntriesLate,
+    TdfStandings,
     Ranking,
     Leaderboard,
     Hero,
@@ -45,6 +46,7 @@ impl MessageTemplate {
             MessageTemplate::NewEntriesLate => "late_entries.txt",
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
             MessageTemplate::Ranking => "ranking.txt",
+            MessageTemplate::TdfStandings => "tdf.txt",
             MessageTemplate::Leaderboard => "leaderboard.txt",
             MessageTemplate::Hero => "hero.txt",
         }
@@ -63,6 +65,7 @@ impl MessageTemplate {
                  \x20 `!help`: the commands\n\
                  \x20 `!standings [year]`: standings by local score for the current year [or specified year]\n\
                  \x20 `!leaderboard [year]`: leaderboard state for the current year [or specified year]\n\
+                 \x20 `!tdf [jersey] [year]`: Tour de France standing for the yellow [or specified jersey color] for the current year [or specified year]\n\
                 "
             },
             MessageTemplate::DailyChallenge => {
@@ -123,6 +126,14 @@ impl MessageTemplate {
                     📓 Learderboard from the {{ year }} event:
                 {%- endif -%}
                 ```{{ leaderboard }}```"
+            }
+            MessageTemplate::TdfStandings => {
+                "{%- if current_year -%}
+                    🚴 {{ '🟡' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings as of {{timestamp}}:\n\
+                {%- else -%}
+                    🚴 {{ '🟡' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings from the {{ year }} event:\n\
+                {%- endif -%}
+                ```{{ standings }}```"
             }
         }
     }

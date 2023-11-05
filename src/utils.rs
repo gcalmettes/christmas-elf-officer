@@ -1,4 +1,7 @@
-use crate::aoc::leaderboard::{Entry, Leaderboard};
+use crate::aoc::{
+    leaderboard::{Entry, Identifier, Leaderboard},
+    standings::PENALTY_UNFINISHED_DAY,
+};
 use chrono::{Datelike, Duration, Utc};
 use itertools::Itertools;
 use serde::Serialize;
@@ -50,6 +53,17 @@ pub fn format_duration(duration: Duration) -> String {
     let minutes = (duration.num_seconds() / 60) % 60;
     let hours = (duration.num_seconds() / 60) / 60;
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds,)
+}
+
+pub fn format_duration_with_days(duration: Duration) -> String {
+    let seconds = duration.num_seconds() % 60;
+    let minutes = (duration.num_seconds() / 60) % 60;
+    let hours = ((duration.num_seconds() / 60) / 60) % 24;
+    let days = ((duration.num_seconds() / 60) / 60) / 24;
+    format!(
+        "{:02} days {:02}:{:02}:{:02}",
+        days, hours, minutes, seconds,
+    )
 }
 
 #[derive(Serialize, Debug)]
@@ -145,4 +159,40 @@ pub fn get_new_members(cur: &Leaderboard, new: &Leaderboard) -> Vec<String> {
     let cur = cur.iter().map(|e| &e.id.name).collect::<HashSet<&String>>();
     let new = new.iter().map(|e| &e.id.name).collect::<HashSet<&String>>();
     new.difference(&cur).map(|n| n.to_string()).collect()
+}
+
+pub fn format_tdf_standings(entries: Vec<(&Identifier, i64, i64)>) -> String {
+    // calculate width for positions
+    // the width of the maximum position to be displayed, plus one for ')'
+    let width_pos = entries.len().to_string().len();
+
+    // calculate width for names
+    // the length of the longest name, plus one for ':'
+    let width_name = 1 + entries
+        .iter()
+        .map(|(id, _, _)| id.name.len())
+        .max()
+        .unwrap_or_default();
+
+    // Max possible width for duration is all days above cutoff time
+    let width_duration =
+        format_duration_with_days(Duration::seconds(*PENALTY_UNFINISHED_DAY * 25)).len();
+
+    entries
+        .iter()
+        .enumerate()
+        .map(|(idx, (id, total_seconds, penalties))| {
+            format!(
+                "{:>width_pos$}) {:<width_name$} {:>width_duration$}  {}",
+                // idx is zero-based
+                idx + 1,
+                id.name,
+                format_duration_with_days(Duration::seconds(*total_seconds)),
+                match penalties > &0 {
+                    true => format!("({penalties} days over the cut off)"),
+                    false => "(COMPLETED)".to_string(),
+                }
+            )
+        })
+        .join("\n")
 }

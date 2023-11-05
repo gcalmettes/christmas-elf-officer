@@ -208,21 +208,3 @@ fn error_handler(
     // so that Slack knows whether to retry
     StatusCode::OK
 }
-
-// fn has_command(message: &Option<String>) -> Option<String> {
-//     match *message {
-//         Some(ref text) => {
-//             let re =
-//                 Regex::new(r"!help\s(?P<command>.*?)$").expect("command regex should not fail");
-//             let command_result = re
-//                 .captures(text)
-//                 .map(|capture| String::from(&capture["command"]));
-//             if command_result == Some("".to_owned()) {
-//                 None
-//             } else {
-//                 command_result
-//             }
-//         }
-//         _ => None,
-//     }
-// }
