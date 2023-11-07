@@ -255,8 +255,11 @@ impl Leaderboard {
         )
     }
 
+    //TODO: do not compute for all the years, but only for specific year.
+    // Unless we want a different function so we can have all time scores
+    // TODO: do the same for stars. Probably make something that is common like TDF
     /// (year, id) => [(n stars, score per day) for that year]
-    pub fn daily_stars_scores_per_year_member(
+    pub fn daily_parts_scores_per_year_member(
         &self,
     ) -> HashMap<(i32, &Identifier), [(u8, usize); 25]> {
         // Max point earned for each star is number of members in leaderboard
@@ -379,71 +382,6 @@ impl Leaderboard {
                 .and_then(|(_name, duration, rank)| Some((*duration, *rank))),
         };
         Ok(stats)
-    }
-
-    pub fn show_year(&self, year: i32) -> String {
-        let scores = self.daily_stars_scores_per_year_member();
-        let entries = scores
-            .iter()
-            .filter(|((y, _id), _scores)| y == &year)
-            .map(|((_y, id), scores)| {
-                // we compute total score, and total number of stars
-                (
-                    id,
-                    scores,
-                    scores.iter().fold((0, 0), |acc, s| {
-                        // (number of stars, score)
-                        (acc.0 + s.0, acc.1 + s.1)
-                    }),
-                )
-            })
-            // sort by score descending, then by star count descending
-            .sorted_unstable_by_key(|entry| (Reverse(entry.2 .1), Reverse(entry.2 .0)))
-            .collect::<Vec<_>>();
-
-        // calculate width for positions
-        // the width of the maximum position to be displayed, plus one for ')'
-        let width_pos = entries.len().to_string().len();
-
-        // calculate width for names
-        // the length of the longest name, plus one for ':'
-        let width_name = 1 + entries
-            .iter()
-            .map(|(id, _scores, (_n_stars, _total))| id.name.len())
-            .max()
-            .unwrap_or_default();
-
-        // calculate width for scores
-        // the width of the maximum score, formatted to two decimal places
-        let width_score = entries
-            .iter()
-            .map(|(_id, _scores, (_n_stars, total))| total)
-            .max()
-            .map(|s| 1 + s.to_string().len())
-            .unwrap_or_default();
-
-        entries
-            .iter()
-            .enumerate()
-            .map(|(idx, (id, scores, (_n_stars, total)))| {
-                format!(
-                    "{:>width_pos$}) {:<width_name$} {:>width_score$}  [{}]",
-                    // idx is zero-based
-                    idx + 1,
-                    id.name,
-                    total,
-                    scores
-                        .iter()
-                        .map(|(n_star, _s)| match n_star {
-                            0 => " -",
-                            1 => " □",
-                            2 => " ■",
-                            _ => unreachable!(),
-                        })
-                        .collect::<String>()
-                )
-            })
-            .join("\n")
     }
 
     fn is_entry_count_equal_to(&self, n: usize) -> bool {

@@ -161,38 +161,109 @@ pub fn get_new_members(cur: &Leaderboard, new: &Leaderboard) -> Vec<String> {
     new.difference(&cur).map(|n| n.to_string()).collect()
 }
 
-pub fn format_tdf_standings(entries: Vec<(&Identifier, i64, i64)>) -> String {
-    // calculate width for positions
-    // the width of the maximum position to be displayed, plus one for ')'
-    let width_pos = entries.len().to_string().len();
+// Helper for formatting all standings
+pub struct StandingsFmt;
 
-    // calculate width for names
-    // the length of the longest name, plus one for ':'
-    let width_name = 1 + entries
-        .iter()
-        .map(|(id, _, _)| id.name.len())
-        .max()
-        .unwrap_or_default();
+impl StandingsFmt {
+    pub fn tdf(entries: Vec<(&Identifier, i64, i64)>) -> String {
+        // calculate width for positions
+        // the width of the maximum position to be displayed, plus one for ')'
+        let width_pos = entries.len().to_string().len();
 
-    // Max possible width for duration is all days above cutoff time
-    let width_duration =
-        format_duration_with_days(Duration::seconds(*PENALTY_UNFINISHED_DAY * 25)).len();
+        // calculate width for names
+        // the length of the longest name, plus one for ':'
+        let width_name = 1 + entries
+            .iter()
+            .map(|(id, _, _)| id.name.len())
+            .max()
+            .unwrap_or_default();
 
-    entries
-        .iter()
-        .enumerate()
-        .map(|(idx, (id, total_seconds, penalties))| {
-            format!(
-                "{:>width_pos$}) {:<width_name$} {:>width_duration$}  {}",
-                // idx is zero-based
-                idx + 1,
-                id.name,
-                format_duration_with_days(Duration::seconds(*total_seconds)),
-                match penalties > &0 {
-                    true => format!("({penalties} days over the cut off)"),
-                    false => "(COMPLETED)".to_string(),
-                }
-            )
-        })
-        .join("\n")
+        // Max possible width for duration is all days above cutoff time
+        let width_duration =
+            format_duration_with_days(Duration::seconds(*PENALTY_UNFINISHED_DAY * 25)).len();
+
+        entries
+            .iter()
+            .enumerate()
+            .map(|(idx, (id, total_seconds, penalties))| {
+                format!(
+                    "{:>width_pos$}) {:<width_name$} {:>width_duration$}  {}",
+                    // idx is zero-based
+                    idx + 1,
+                    id.name,
+                    format_duration_with_days(Duration::seconds(*total_seconds)),
+                    match penalties > &0 {
+                        true => format!("({penalties} days over the cut off)"),
+                        false => "(COMPLETED)".to_string(),
+                    }
+                )
+            })
+            .join("\n")
+    }
+
+    // completions map ranked by local score
+    pub fn board_by_local_score(leaderboard: &Leaderboard, year: i32) -> String {
+        let scores = leaderboard.daily_parts_scores_per_year_member();
+        let entries = scores
+            .iter()
+            .filter(|((y, _id), _scores)| y == &year)
+            .map(|((_y, id), scores)| {
+                // we compute total score, and total number of stars
+                (
+                    id,
+                    scores,
+                    scores.iter().fold((0, 0), |acc, s| {
+                        // (number of stars, score)
+                        (acc.0 + s.0, acc.1 + s.1)
+                    }),
+                )
+            })
+            // sort by score descending, then by star count descending
+            .sorted_unstable_by_key(|entry| (Reverse(entry.2 .1), Reverse(entry.2 .0)))
+            .collect::<Vec<_>>();
+
+        // calculate width for positions
+        // the width of the maximum position to be displayed, plus one for ')'
+        let width_pos = entries.len().to_string().len();
+
+        // calculate width for names
+        // the length of the longest name, plus one for ':'
+        let width_name = 1 + entries
+            .iter()
+            .map(|(id, _scores, (_n_stars, _total))| id.name.len())
+            .max()
+            .unwrap_or_default();
+
+        // calculate width for scores
+        // the width of the maximum score, formatted to two decimal places
+        let width_score = entries
+            .iter()
+            .map(|(_id, _scores, (_n_stars, total))| total)
+            .max()
+            .map(|s| 1 + s.to_string().len())
+            .unwrap_or_default();
+
+        entries
+            .iter()
+            .enumerate()
+            .map(|(idx, (id, scores, (_n_stars, total)))| {
+                format!(
+                    "{:>width_pos$}) {:<width_name$} {:>width_score$}  [{}]",
+                    // idx is zero-based
+                    idx + 1,
+                    id.name,
+                    total,
+                    scores
+                        .iter()
+                        .map(|(n_star, _s)| match n_star {
+                            0 => " -",
+                            1 => " □",
+                            2 => " ■",
+                            _ => unreachable!(),
+                        })
+                        .collect::<String>()
+                )
+            })
+            .join("\n")
+    }
 }

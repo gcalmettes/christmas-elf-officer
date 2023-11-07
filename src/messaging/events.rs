@@ -2,7 +2,7 @@ use crate::{
     aoc::leaderboard::{LeaderboardStatistics, ProblemPart, ScrapedLeaderboard},
     aoc::standings::{standings_by_local_score, standings_tdf, Jersey, JERSEY_COLORS},
     messaging::templates::MessageTemplate,
-    utils::{current_year_day, format_duration, format_rank, format_tdf_standings, DayHighlight},
+    utils::{current_year_day, format_duration, format_rank, DayHighlight, StandingsFmt},
 };
 
 use chrono::{DateTime, Datelike, Local, Utc};
@@ -77,7 +77,7 @@ impl Command {
                     .and_then(|y| y.parse::<i32>().ok())
                     .unwrap_or_else(|| current_year_day().0);
 
-                let formatted = leaderboard.leaderboard.show_year(year);
+                let formatted = StandingsFmt::board_by_local_score(&leaderboard.leaderboard, year);
                 Command::LeaderboardHistogram(year, formatted, leaderboard.timestamp)
             }
 
@@ -101,7 +101,7 @@ impl Command {
                 let jersey = jersey.unwrap_or(Jersey::YELLOW);
 
                 let data = standings_tdf(&jersey, &leaderboard.leaderboard, year);
-                let formatted = format_tdf_standings(data);
+                let formatted = StandingsFmt::tdf(data);
                 Command::PrivateStandingTdf(year, formatted, leaderboard.timestamp, jersey)
             }
             _ => unreachable!(),
