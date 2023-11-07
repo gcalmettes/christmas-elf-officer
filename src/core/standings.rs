@@ -1,4 +1,4 @@
-use crate::aoc::leaderboard::{Entry, Identifier, Leaderboard, ProblemPart};
+use crate::core::leaderboard::{Entry, Identifier, Leaderboard, ProblemPart};
 use chrono::{DateTime, Duration, Utc};
 use itertools::Itertools;
 use once_cell::sync::Lazy;

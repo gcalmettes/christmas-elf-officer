@@ -4,7 +4,6 @@ use itertools::{Itertools, MinMaxResult};
 use scraper::{Node, Selector};
 use serde::Serialize;
 use std::{
-    cmp::Reverse,
     collections::{HashMap, HashSet},
     fmt,
     iter::Iterator,

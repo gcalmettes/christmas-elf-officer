@@ -1,7 +1,7 @@
 use crate::{
     config,
+    core::{commands::Command, events::Event},
     error::BotError,
-    messaging::events::{Command, Event},
     storage::MemoryCache,
 };
 use http::StatusCode;

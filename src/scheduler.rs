@@ -1,8 +1,8 @@
 use crate::{
-    aoc::client::AoC,
+    client::aoc::AoC,
     config,
+    core::events::Event,
     error::{BotError, BotResult},
-    messaging::events::Event,
     storage::MemoryCache,
     utils::{compute_highlights, current_year_day, get_new_members},
 };

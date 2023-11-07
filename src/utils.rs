@@ -1,4 +1,4 @@
-use crate::aoc::{
+use crate::core::{
     leaderboard::{Entry, Identifier, Leaderboard},
     standings::PENALTY_UNFINISHED_DAY,
 };

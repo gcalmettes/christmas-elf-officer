@@ -3,15 +3,16 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 use tracing::info;
 
-use messaging::{client::AoCSlackClient, events::Event};
+use client::slack::AoCSlackClient;
+use core::events::Event;
 use scheduler::{JobProcess, Scheduler};
 use storage::MemoryCache;
 
-pub mod aoc;
 pub mod cli;
+pub mod client;
 pub mod config;
+pub mod core;
 pub mod error;
-pub mod messaging;
 pub mod scheduler;
 pub mod storage;
 pub mod utils;
