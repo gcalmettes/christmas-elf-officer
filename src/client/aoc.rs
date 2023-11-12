@@ -1,6 +1,6 @@
 use crate::{
-    aoc::leaderboard::{Entry, Identifier, Leaderboard, ProblemPart, ScrapedLeaderboard},
     config,
+    core::leaderboard::{Entry, Identifier, Leaderboard, ProblemPart, ScrapedLeaderboard},
     error::{BotError, BotResult},
 };
 use chrono::{TimeZone, Utc};

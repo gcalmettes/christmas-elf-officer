@@ -1,4 +1,4 @@
-use crate::aoc::leaderboard::{Entry, Leaderboard};
+use crate::core::leaderboard::{Entry, Leaderboard};
 use chrono::{Datelike, Duration, Utc};
 use itertools::Itertools;
 use serde::Serialize;
@@ -50,6 +50,23 @@ pub fn format_duration(duration: Duration) -> String {
     let minutes = (duration.num_seconds() / 60) % 60;
     let hours = (duration.num_seconds() / 60) / 60;
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds,)
+}
+
+pub fn format_duration_with_days(duration: Duration) -> String {
+    let seconds = duration.num_seconds() % 60;
+    let minutes = (duration.num_seconds() / 60) % 60;
+    let hours = ((duration.num_seconds() / 60) / 60) % 24;
+    let days = ((duration.num_seconds() / 60) / 60) / 24;
+    format!(
+        "{:02} days {:02}:{:02}:{:02}",
+        days, hours, minutes, seconds,
+    )
+}
+
+pub fn get_new_members(cur: &Leaderboard, new: &Leaderboard) -> Vec<String> {
+    let cur = cur.iter().map(|e| &e.id.name).collect::<HashSet<&String>>();
+    let new = new.iter().map(|e| &e.id.name).collect::<HashSet<&String>>();
+    new.difference(&cur).map(|n| n.to_string()).collect()
 }
 
 #[derive(Serialize, Debug)]
@@ -139,10 +156,4 @@ pub fn compute_highlights(current: &Leaderboard, new: &Leaderboard) -> Vec<DayHi
         .collect::<Vec<DayHighlight>>();
 
     highlights
-}
-
-pub fn get_new_members(cur: &Leaderboard, new: &Leaderboard) -> Vec<String> {
-    let cur = cur.iter().map(|e| &e.id.name).collect::<HashSet<&String>>();
-    let new = new.iter().map(|e| &e.id.name).collect::<HashSet<&String>>();
-    new.difference(&cur).map(|n| n.to_string()).collect()
 }
