@@ -30,7 +30,7 @@ pub enum MessageTemplate {
     NewEntriesLate,
     TdfStandings,
     Ranking,
-    Leaderboard,
+    LeaderboardDisplay,
     Hero,
 }
 
@@ -47,7 +47,7 @@ impl MessageTemplate {
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
             MessageTemplate::Ranking => "ranking.txt",
             MessageTemplate::TdfStandings => "tdf.txt",
-            MessageTemplate::Leaderboard => "leaderboard.txt",
+            MessageTemplate::LeaderboardDisplay => "leaderboard.txt",
             MessageTemplate::Hero => "hero.txt",
         }
     }
@@ -59,13 +59,36 @@ impl MessageTemplate {
     pub fn template(&self) -> &'static str {
         // \n\ at each code line end creates a line break at the proper position and discards further spaces in this line of code.
         // \x20 (hex; 32 in decimal) is an ASCII space and an indicator for the first space to be preserved in this line of the string.
+
+        // !fast [method] [day] [year]
+
         match self {
             MessageTemplate::Help => {
-                "🆘 below are the bot commands:\n\
-                 \x20 `!help`: the commands\n\
-                 \x20 `!standings [year]`: standings by local score for the current year [or specified year]\n\
-                 \x20 `!leaderboard [year]`: leaderboard state for the current year [or specified year]\n\
-                 \x20 `!tdf [jersey] [year]`: Tour de France standing for the yellow [or specified jersey color] for the current year [or specified year]\n\
+                // "🆘 below are the bot commands:\n\
+                //  \x20 • `!help`: you're currently reading this!\n\
+                //  \x20 • `!fast [delta|p1|p2] [day] [year]`: Fastest in the pack! Default are by delta time, for current day.\n\
+                //  \x20 • `!board [local|stars] [year]`: Leaderboard display. Default are by local score and current year.\n\
+                //  \x20 • `!tdf [yellow|green] [year]`: Tour de France standing! Default are Yellow jersey and current year.\n\
+                // "
+                "🗒️ Everything you need to know:\n\n\n\
+                • 🆘How to\n\
+                ```!help```\n\
+                Explains the bot commands. You're currently reading this.\n\n\n\
+                • 🏎️ Fastest of the West!\n\
+                ```!fast [delta|p1|p2] [day] [year]```\n\
+                *Fastest time(s) for the day*. By default, the ranking is based on the `delta` time for the day,\
+                but individual `p1` and `p2` rankings are also available.\
+                If no day and/or year is set, the *current day is automatically defined*.\n\
+                Examples of valid syntaxes are `!fast`, `!fast p1`, `!fast 3`, `!fast p2 11` and `!fast delta 7 2020`\n\n\n\
+                • 📊 Show me the board!\n\
+                ```!board [local|stars] [year]```\n\
+                *Current score and stars completion for the year*, shown as a neat ascii board. Default is ranking by `local`\
+                score for the current year, but ranking by number of `stars` is also available.\n\
+                Examples of valid syntaxes are `!board`, `!board stars`, `!board 2022` and `!board local 2021`\n\n\n\
+                • 🚴 The long haul!\n\
+                ```!tdf [yellow|green] [year]```\n\
+                *Tour de France kind-of standing*! Come and compete in to earn `yellow` or `green` points.\
+                Default is ranking for the Yellow jersey for the current year.
                 "
             },
             MessageTemplate::DailyChallenge => {
@@ -107,34 +130,41 @@ impl MessageTemplate {
                     \x20 • Delta times range: 🏃‍♀️ {{delta_fast}} - {{delta_slow}} 🚶‍♀️"
             }
             MessageTemplate::Ranking => {
-                "{% if current_year %}
-                    :first_place_medal: Current ranking as of {{timestamp}}:\n\
+                "{% if current_day %}
+                    Today's fastest *{{ ranking_method }} time* (as of {{timestamp}}):\n\
                 {% else %}
-                    :first_place_medal: Ranking from the {{ year }} event:\n\
+                    Fastest *{{ ranking_method }} time* for day {{ day }}/12/{{ year }}:\n\
                 {% endif %}
-                {%- for (name, score) in scores %}\n\
-                 • {{name}} \t {{score}}
+                {%- for (name, time) in ranking %}\n\
+                 • {{name}} \t {{time}}
                 {%- endfor %}"
             }
             MessageTemplate::Hero => {
                 "🎉 🥳 Our very own *{{ name }}* made it to the global leaderboard on part *{{ part }}*! (*{{ rank }}*) 🙌"
             },
-            MessageTemplate::Leaderboard => {
+            MessageTemplate::LeaderboardDisplay => {
                 "{%- if current_year -%}
-                    📓 Current Leaderboard as of {{timestamp}}:
+                    📓 Current Leaderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} as of {{timestamp}}:
                 {%- else -%}
-                    📓 Learderboard from the {{ year }} event:
+                    📓 Learderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} from the {{ year }} event:
                 {%- endif -%}
                 ```{{ leaderboard }}```"
             }
             MessageTemplate::TdfStandings => {
                 "{%- if current_year -%}
-                    🚴 {{ '🟡' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings as of {{timestamp}}:\n\
+                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings as of {{timestamp}}:\n\
                 {%- else -%}
-                    🚴 {{ '🟡' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings from the {{ year }} event:\n\
+                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings from the {{ year }} event:\n\
                 {%- endif -%}
                 ```{{ standings }}```"
             }
         }
     }
 }
+
+// year => year,
+// day => day,
+// current_year => year == &now.year(),
+// timestamp => timestamp,
+// ranking => data,
+// ranking_method => method.to_string()

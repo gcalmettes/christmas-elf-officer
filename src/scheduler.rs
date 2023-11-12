@@ -250,7 +250,7 @@ async fn watch_global_leaderboard_job(
                             let private_leaderboard = cache.data.lock().unwrap();
                             global_leaderboard
                                 .leaderboard
-                                .get_members_entries_union_with(&private_leaderboard.leaderboard)
+                                .get_common_members_with(&private_leaderboard.leaderboard)
                         };
 
                         for entry in hero_entries {

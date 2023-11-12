@@ -1,9 +1,10 @@
 use crate::{
     core::{
+        display,
         leaderboard::ScrapedLeaderboard,
-        standings::{standings_by_local_score, standings_tdf, Jersey, JERSEY_COLORS},
+        standings::{standings_board, standings_tdf, standings_time, Jersey, Ranking, Scoring},
     },
-    utils::{current_year_day, StandingsFmt},
+    utils::current_year_day,
 };
 
 use chrono::{DateTime, Utc};
@@ -11,16 +12,16 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::iter::Iterator;
 
-const COMMANDS: [&'static str; 4] = ["!help", "!standings", "!leaderboard", "!tdf"];
+const COMMANDS: [&'static str; 4] = ["!help", "!fast", "!board", "!tdf"];
 // All words, with optional "!" prefix
 static REGEX_WORDS: Lazy<Regex> = Lazy::new(|| Regex::new(r"!?\w+").unwrap());
 
 #[derive(Debug, Clone)]
 pub enum Command {
     Help,
-    PrivateStandingByLocalScore(i32, Vec<(String, String)>, DateTime<Utc>),
-    PrivateStandingTdf(i32, String, DateTime<Utc>, Jersey),
-    LeaderboardHistogram(i32, String, DateTime<Utc>),
+    Ranking(i32, u8, Vec<(String, String)>, DateTime<Utc>, Ranking),
+    StandingTdf(i32, String, DateTime<Utc>, Jersey),
+    LeaderboardDisplay(i32, String, DateTime<Utc>, Scoring),
 }
 
 impl Command {
@@ -43,33 +44,64 @@ impl Command {
         match start_with {
             cmd if cmd == COMMANDS[0] => Command::Help,
             cmd if cmd == COMMANDS[1] => {
-                // !ranking
+                // !fast
+                let ranking_method = input.next().unwrap_or_else(|| Ranking::get_default_str());
+                let ranking = Ranking::from_string(ranking_method);
+
+                let day = match ranking {
+                    // it might be possible that someone requested !leaderboard <year>
+                    None => ranking_method
+                        .parse::<u8>()
+                        .ok()
+                        .unwrap_or_else(|| current_year_day().1),
+                    Some(_) => input
+                        .next()
+                        .and_then(|y| y.parse::<u8>().ok())
+                        .unwrap_or_else(|| current_year_day().1),
+                };
+
                 let year = input
                     .next()
                     .and_then(|y| y.parse::<i32>().ok())
                     .unwrap_or_else(|| current_year_day().0);
 
-                let data = standings_by_local_score(&leaderboard.leaderboard, year)
-                    .iter()
-                    .map(|(id, s)| (id.name.to_string(), s.to_string()))
-                    .collect::<Vec<(String, String)>>();
+                // // TODO: find a syntax to pass the year. Right now only now
+                // // maybe !fast [method] [day] [year] ?
+                // let year = current_year_day().0;
 
-                Command::PrivateStandingByLocalScore(year, data, leaderboard.timestamp)
+                let ranking = ranking.unwrap_or(Ranking::DELTA);
+
+                let data = standings_time(&ranking, &leaderboard.leaderboard, year, day);
+
+                Command::Ranking(year, day, data, leaderboard.timestamp, ranking)
             }
             cmd if cmd == COMMANDS[2] => {
-                // !leaderboard
-                let year = input
-                    .next()
-                    .and_then(|y| y.parse::<i32>().ok())
-                    .unwrap_or_else(|| current_year_day().0);
+                // !board
+                let scoring_method = input.next().unwrap_or_else(|| Scoring::get_default_str());
+                let scoring = Scoring::from_string(scoring_method);
 
-                let formatted = StandingsFmt::board_by_local_score(&leaderboard.leaderboard, year);
-                Command::LeaderboardHistogram(year, formatted, leaderboard.timestamp)
+                let year = match scoring {
+                    // it might be possible that someone requested !leaderboard <year>
+                    None => scoring_method
+                        .parse::<i32>()
+                        .ok()
+                        .unwrap_or_else(|| current_year_day().0),
+                    Some(_) => input
+                        .next()
+                        .and_then(|y| y.parse::<i32>().ok())
+                        .unwrap_or_else(|| current_year_day().0),
+                };
+
+                let scoring = scoring.unwrap_or(Scoring::LOCAL);
+
+                let data = standings_board(&scoring, &leaderboard.leaderboard, year);
+                let formatted = display::board(data);
+                Command::LeaderboardDisplay(year, formatted, leaderboard.timestamp, scoring)
             }
 
             cmd if cmd == COMMANDS[3] => {
                 // !tdf
-                let color = input.next().unwrap_or_else(|| JERSEY_COLORS[0]);
+                let color = input.next().unwrap_or_else(|| Jersey::get_default_str());
                 let jersey = Jersey::from_string(color);
 
                 let year = match jersey {
@@ -87,8 +119,8 @@ impl Command {
                 let jersey = jersey.unwrap_or(Jersey::YELLOW);
 
                 let data = standings_tdf(&jersey, &leaderboard.leaderboard, year);
-                let formatted = StandingsFmt::tdf(data);
-                Command::PrivateStandingTdf(year, formatted, leaderboard.timestamp, jersey)
+                let formatted = display::tdf(data);
+                Command::StandingTdf(year, formatted, leaderboard.timestamp, jersey)
             }
             _ => unreachable!(),
         }

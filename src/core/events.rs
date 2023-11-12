@@ -139,7 +139,7 @@ impl fmt::Display for Event {
                 Command::Help => {
                     write!(f, "{}", MessageTemplate::Help.get().render({}).unwrap())
                 }
-                Command::PrivateStandingByLocalScore(year, data, time) => {
+                Command::Ranking(year, day, data, time, method) => {
                     let now = time.with_timezone(&Local);
                     let timestamp = format!("{}", now.format("%d/%m/%Y %H:%M:%S"));
 
@@ -150,32 +150,35 @@ impl fmt::Display for Event {
                             .get()
                             .render(context! {
                                 year => year,
-                                current_year => year == &now.year(),
+                                day => day,
+                                current_day => year == &now.year() && *day as u32 == now.day(),
                                 timestamp => timestamp,
-                                scores => data
+                                ranking => data,
+                                ranking_method => method.to_string()
                             })
                             .unwrap()
                     )
                 }
-                Command::LeaderboardHistogram(year, histogram, time) => {
+                Command::LeaderboardDisplay(year, board, time, method) => {
                     let now = time.with_timezone(&Local);
                     let timestamp = format!("{}", now.format("%d/%m/%Y %H:%M:%S"));
 
                     write!(
                         f,
                         "{}",
-                        MessageTemplate::Leaderboard
+                        MessageTemplate::LeaderboardDisplay
                             .get()
                             .render(context! {
                                 year => year,
                                 current_year => year == &now.year(),
                                 timestamp => timestamp,
-                                leaderboard => histogram
+                                leaderboard => board,
+                                scoring_method => method.to_string()
                             })
                             .unwrap()
                     )
                 }
-                Command::PrivateStandingTdf(year, standings, time, jersey) => {
+                Command::StandingTdf(year, standings, time, jersey) => {
                     let now = time.with_timezone(&Local);
                     let timestamp = format!("{}", now.format("%d/%m/%Y %H:%M:%S"));
 
