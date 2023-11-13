@@ -6,15 +6,21 @@ use crate::{
     },
     utils::current_year_day,
 };
-
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use std::iter::Iterator;
+use std::{collections::HashMap, iter::Iterator};
 
 const COMMANDS: [&'static str; 4] = ["!help", "!fast", "!board", "!tdf"];
-// All words, with optional "!" prefix
-static REGEX_WORDS: Lazy<Regex> = Lazy::new(|| Regex::new(r"!?\w+").unwrap());
+static REGEX_COMMANDS: Lazy<Regex> =
+    Lazy::new(|| {
+        let commands = COMMANDS.join(r"|^");
+        Regex::new(format!(
+            // <option> set at the end so all other matches have priority
+            r"(?<cmd>^{commands})|(?<year>\b\d{{4}}\b)|(?<day>\b\d{{1,2}}\b)|(?<option>\b[\S]+\b)"
+    ).as_str())
+    .unwrap()
+    });
 
 #[derive(Debug, Clone)]
 pub enum Command {
@@ -25,104 +31,98 @@ pub enum Command {
 }
 
 impl Command {
+    pub fn parse_string(input: &str) -> HashMap<&str, &str> {
+        REGEX_COMMANDS
+            .captures_iter(input)
+            .flat_map(|caps| {
+                REGEX_COMMANDS
+                    .capture_names()
+                    .filter_map(|o| o.and_then(|n| Some((n, caps.name(n)?.as_str()))))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
+            .into_iter()
+            // if several matches for a capture type, we want the first iteration to prevail
+            .rev()
+            .collect()
+    }
     pub fn is_command(input: &str) -> bool {
-        REGEX_WORDS
-            .find_iter(&input)
-            .map(|mat| mat.as_str())
-            .next()
-            .and_then(|start_with| Some(COMMANDS.contains(&start_with)))
-            .unwrap_or_default()
+        Self::parse_string(input).get("cmd").is_some()
     }
 
     // Note that we call this command on matching command strings, so we know
     // input string is a command. We might want to return Option<Command> later on.
-    pub fn build_from(input: String, leaderboard: &ScrapedLeaderboard) -> Command {
-        let mut input = REGEX_WORDS.find_iter(&input).map(|mat| mat.as_str());
-        // Here we know it's safe to unwrap, as we pass only valid commands.
-        // That might change in the future.
-        let start_with = input.next().unwrap();
-        match start_with {
-            cmd if cmd == COMMANDS[0] => Command::Help,
-            cmd if cmd == COMMANDS[1] => {
-                // !fast
-                let ranking_method = input.next().unwrap_or_else(|| Ranking::get_default_str());
-                let ranking = Ranking::from_string(ranking_method);
+    pub fn build_from(input: String, leaderboard: &ScrapedLeaderboard) -> Option<Command> {
+        let parsed = Self::parse_string(&input);
 
-                let day = match ranking {
-                    // it might be possible that someone requested !leaderboard <year>
-                    None => ranking_method
-                        .parse::<u8>()
-                        .ok()
-                        .unwrap_or_else(|| current_year_day().1),
-                    Some(_) => input
-                        .next()
-                        .and_then(|y| y.parse::<u8>().ok())
-                        .unwrap_or_else(|| current_year_day().1),
-                };
-
-                let year = input
-                    .next()
-                    .and_then(|y| y.parse::<i32>().ok())
+        match parsed.get("cmd") {
+            Some(cmd) if cmd == &COMMANDS[0] => Some(Command::Help),
+            Some(cmd) if cmd == &COMMANDS[1] => {
+                let ranking_str = parsed
+                    .get("option")
+                    .and_then(|o| Some(*o))
+                    .unwrap_or_else(|| Ranking::get_default_str());
+                let ranking = Ranking::from_string(ranking_str).unwrap_or(Ranking::DELTA);
+                let year = parsed
+                    .get("year")
+                    .and_then(|d| d.parse::<i32>().ok())
                     .unwrap_or_else(|| current_year_day().0);
-
-                // // TODO: find a syntax to pass the year. Right now only now
-                // // maybe !fast [method] [day] [year] ?
-                // let year = current_year_day().0;
-
-                let ranking = ranking.unwrap_or(Ranking::DELTA);
+                let day = parsed
+                    .get("day")
+                    .and_then(|d| d.parse::<u8>().ok())
+                    .unwrap_or_else(|| current_year_day().1);
 
                 let data = standings_time(&ranking, &leaderboard.leaderboard, year, day);
 
-                Command::Ranking(year, day, data, leaderboard.timestamp, ranking)
+                Some(Command::Ranking(
+                    year,
+                    day,
+                    data,
+                    leaderboard.timestamp,
+                    ranking,
+                ))
             }
-            cmd if cmd == COMMANDS[2] => {
-                // !board
-                let scoring_method = input.next().unwrap_or_else(|| Scoring::get_default_str());
-                let scoring = Scoring::from_string(scoring_method);
-
-                let year = match scoring {
-                    // it might be possible that someone requested !leaderboard <year>
-                    None => scoring_method
-                        .parse::<i32>()
-                        .ok()
-                        .unwrap_or_else(|| current_year_day().0),
-                    Some(_) => input
-                        .next()
-                        .and_then(|y| y.parse::<i32>().ok())
-                        .unwrap_or_else(|| current_year_day().0),
-                };
-
-                let scoring = scoring.unwrap_or(Scoring::LOCAL);
+            Some(cmd) if cmd == &COMMANDS[2] => {
+                let scoring_str = parsed
+                    .get("option")
+                    .and_then(|o| Some(*o))
+                    .unwrap_or_else(|| &Scoring::get_default_str());
+                let scoring = Scoring::from_string(scoring_str).unwrap_or(Scoring::LOCAL);
+                let year = parsed
+                    .get("year")
+                    .and_then(|d| d.parse::<i32>().ok())
+                    .unwrap_or_else(|| current_year_day().0);
 
                 let data = standings_board(&scoring, &leaderboard.leaderboard, year);
                 let formatted = display::board(data);
-                Command::LeaderboardDisplay(year, formatted, leaderboard.timestamp, scoring)
+                Some(Command::LeaderboardDisplay(
+                    year,
+                    formatted,
+                    leaderboard.timestamp,
+                    scoring,
+                ))
             }
-
-            cmd if cmd == COMMANDS[3] => {
-                // !tdf
-                let color = input.next().unwrap_or_else(|| Jersey::get_default_str());
-                let jersey = Jersey::from_string(color);
-
-                let year = match jersey {
-                    // it might be possible that someone requested !tdf <year>
-                    None => color
-                        .parse::<i32>()
-                        .ok()
-                        .unwrap_or_else(|| current_year_day().0),
-                    Some(_) => input
-                        .next()
-                        .and_then(|y| y.parse::<i32>().ok())
-                        .unwrap_or_else(|| current_year_day().0),
-                };
-
-                let jersey = jersey.unwrap_or(Jersey::YELLOW);
+            Some(cmd) if cmd == &COMMANDS[3] => {
+                let jersey_str = parsed
+                    .get("option")
+                    .and_then(|o| Some(*o))
+                    .unwrap_or_else(|| &Jersey::get_default_str());
+                let jersey = Jersey::from_string(jersey_str).unwrap_or(Jersey::YELLOW);
+                let year = parsed
+                    .get("year")
+                    .and_then(|d| d.parse::<i32>().ok())
+                    .unwrap_or_else(|| current_year_day().0);
 
                 let data = standings_tdf(&jersey, &leaderboard.leaderboard, year);
                 let formatted = display::tdf(data);
-                Command::StandingTdf(year, formatted, leaderboard.timestamp, jersey)
+                Some(Command::StandingTdf(
+                    year,
+                    formatted,
+                    leaderboard.timestamp,
+                    jersey,
+                ))
             }
-            _ => unreachable!(),
+            _ => None,
         }
     }
 }

@@ -64,30 +64,23 @@ impl MessageTemplate {
 
         match self {
             MessageTemplate::Help => {
-                // "🆘 below are the bot commands:\n\
-                //  \x20 • `!help`: you're currently reading this!\n\
-                //  \x20 • `!fast [delta|p1|p2] [day] [year]`: Fastest in the pack! Default are by delta time, for current day.\n\
-                //  \x20 • `!board [local|stars] [year]`: Leaderboard display. Default are by local score and current year.\n\
-                //  \x20 • `!tdf [yellow|green] [year]`: Tour de France standing! Default are Yellow jersey and current year.\n\
-                // "
-                "🗒️ Everything you need to know:\n\n\n\
-                • 🆘How to\n\
+                "🗒️ Please find below the CEO commands handbook.\n\
+                Note that the order of the optional arguments passed to a command does (or should) not matter.\n\n\
+                👉 🆘 *How to*\n\
                 ```!help```\n\
-                Explains the bot commands. You're currently reading this.\n\n\n\
-                • 🏎️ Fastest of the West!\n\
-                ```!fast [delta|p1|p2] [day] [year]```\n\
-                *Fastest time(s) for the day*. By default, the ranking is based on the `delta` time for the day,\
+                Explains the bot commands. You're currently reading this.\n\n\
+                👉 🏎️ *Fastest of the West!*\n\
+                ```!fast [ranking method] [day] [year]```\n\
+                Fastest time(s) for the day. By default, the ranking is based on the `delta` time for the day,\
                 but individual `p1` and `p2` rankings are also available.\
-                If no day and/or year is set, the *current day is automatically defined*.\n\
-                Examples of valid syntaxes are `!fast`, `!fast p1`, `!fast 3`, `!fast p2 11` and `!fast delta 7 2020`\n\n\n\
-                • 📊 Show me the board!\n\
-                ```!board [local|stars] [year]```\n\
-                *Current score and stars completion for the year*, shown as a neat ascii board. Default is ranking by `local`\
-                score for the current year, but ranking by number of `stars` is also available.\n\
-                Examples of valid syntaxes are `!board`, `!board stars`, `!board 2022` and `!board local 2021`\n\n\n\
-                • 🚴 The long haul!\n\
-                ```!tdf [yellow|green] [year]```\n\
-                *Tour de France kind-of standing*! Come and compete in to earn `yellow` or `green` points.\
+                If no day and/or year is set, the current day is automatically defined.`\n\n\
+                👉 📊 *Show me the board!*\n\
+                ```!board [ranking method] [year]```\n\
+                Current score and stars completion for the year, shown as a neat ascii board. Default is ranking by `local`\
+                score for the current year, but ranking by number of `stars` is also available.`\n\n\
+                👉 🚴 *The long haul!*\n\
+                ```!tdf [jersey color] [year]```\n\
+                Tour de France kind-of standing! Come and compete in to earn `yellow` or `green` points.\
                 Default is ranking for the Yellow jersey for the current year.
                 "
             },
