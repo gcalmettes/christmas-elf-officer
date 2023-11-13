@@ -98,8 +98,9 @@ impl MessageTemplate {
                  🚨 *Spoilers Ahead* :rotating_light:"
             },
             MessageTemplate::DailySummary => {
-                "🥁 *Daily update* 🗞️\n\
-                Here is how things went down today at the front of the pack:\n\
+                "🗓️ *December, {{day}} {{year}}*\n\
+                ----- 🥁 *Daily update* 🗞️ -----\n\
+                Here is how things went down at the front of the pack today:\n\
                 ___________________________________________________________________\n\
                 Top 5 to finish *PART 1* 🏁\n\
                 {%- for (prefix, name, time) in ranking_p1 %}\n\

@@ -4,7 +4,7 @@ use crate::{
         leaderboard::{LeaderboardStatistics, ProblemPart},
         templates::MessageTemplate,
     },
-    utils::{current_year_day, format_duration, format_rank, DayHighlight},
+    utils::{current_year_day, format_duration, format_rank, ordinal_number_suffix, DayHighlight},
 };
 
 use chrono::{Datelike, Local};
@@ -99,7 +99,7 @@ impl fmt::Display for Event {
                         .get()
                         .render(context! {
                             year => year,
-                            day => day,
+                            day => format!("{day}{}", ordinal_number_suffix(*day)),
                             ranking_p1 => prefixed_p1,
                             ranking_p2 => prefixed_p2,
                             ranking_delta => prefixed_delta,
