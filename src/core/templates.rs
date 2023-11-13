@@ -64,24 +64,25 @@ impl MessageTemplate {
 
         match self {
             MessageTemplate::Help => {
-                "🗒️ Please find below the CEO commands handbook.\n\
-                Note that the order of the optional arguments passed to a command does (or should) not matter.\n\n\
+                "🗒️ Nice work, you've found the *CEO commands handbook*.\n\
+                Note that the command arguments parsing system is a marvel of regex engineering, and as such \
+                the order of the optional arguments passed to a command does not (or at least should not...) matter.\n\n\
                 👉 🆘 *How to*\n\
                 ```!help```\n\
-                Explains the bot commands. You're currently reading this.\n\n\
+                List and explains the bot commands. You're currently reading this.\n\n\
                 👉 🏎️ *Fastest of the West!*\n\
                 ```!fast [ranking method] [day] [year]```\n\
-                Fastest time(s) for the day. By default, the ranking is based on the `delta` time for the day,\
-                but individual `p1` and `p2` rankings are also available.\
+                Fastest time(s) for the day. By default, the ranking is based on the `delta` time for the day, \
+                but individual `p1` and `p2` rankings are also available. \
                 If no day and/or year is set, the current day is automatically defined.`\n\n\
                 👉 📊 *Show me the board!*\n\
                 ```!board [ranking method] [year]```\n\
-                Current score and stars completion for the year, shown as a neat ascii board. Default is ranking by `local`\
+                Current score and stars completion for the year, shown as a neat ascii board. Default is ranking by `local` \
                 score for the current year, but ranking by number of `stars` is also available.`\n\n\
                 👉 🚴 *The long haul!*\n\
                 ```!tdf [jersey color] [year]```\n\
-                Tour de France kind-of standing! Come and compete in to earn `yellow` or `green` points.\
-                Default is ranking for the Yellow jersey for the current year.
+                Tour de France alternative standings! Come join the peloton and compete to earn `yellow` or `green` points. \
+                Default is ranking for the Yellow jersey for the current year.\
                 "
             },
             MessageTemplate::DailyChallenge => {
