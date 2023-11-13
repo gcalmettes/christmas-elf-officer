@@ -23,6 +23,7 @@ pub enum MessageTemplate {
     Help,
     DailyChallenge,
     DailySolutionThread,
+    DailySummary,
     GlobalStatistics,
     PrivateLeaderboardUpdated,
     LeaderboardMemberJoin,
@@ -40,6 +41,7 @@ impl MessageTemplate {
             MessageTemplate::Help => "help.txt",
             MessageTemplate::DailyChallenge => "challenge.txt",
             MessageTemplate::DailySolutionThread => "solution_thread.txt",
+            MessageTemplate::DailySummary => "summary.txt",
             MessageTemplate::PrivateLeaderboardUpdated => "private_leaderboard_updated.txt",
             MessageTemplate::LeaderboardMemberJoin => "private_leaderboard_new_members.txt",
             MessageTemplate::NewEntriesToday => "today_entries.txt",
@@ -95,6 +97,25 @@ impl MessageTemplate {
                     \x20   Refrain yourself to open until you complete part 2!\n\
                  🚨 *Spoilers Ahead* :rotating_light:"
             },
+            MessageTemplate::DailySummary => {
+                "🥁 *Daily update* 🗞️\n\
+                Here is how things went down today at the front of the pack:\n\
+                ___________________________________________________________________\n\
+                Top 5 to finish *PART 1* 🏁\n\
+                {%- for (prefix, name, time) in ranking_p1 %}\n\
+                    {{prefix}} in ⏱️ {{time}} 👉🏻 *{{name}}*
+                {%- endfor %}\n\
+                ___________________________________________________________________\n\
+                Top 5 to finish *PART 2* 🏁\n\
+                {%- for (prefix, name, time) in ranking_p2 %}\n\
+                    {{prefix}} in ⏱️ {{time}} 👉🏻 *{{name}}*
+                {%- endfor %}\n\
+                ___________________________________________________________________\n\
+                Top 5 *DELTA* 🏁\n\
+                {%- for (prefix, name, time) in ranking_delta %}\n\
+                    {{prefix}} in ⏱️ {{time}} 👉🏻 *{{name}}*
+                {%- endfor %}"
+            },
             MessageTemplate::PrivateLeaderboardUpdated => {
                 "🔁 Private Leaderboard successfully updated!"
             },
@@ -129,8 +150,8 @@ impl MessageTemplate {
                 {% else %}
                     Fastest *{{ ranking_method }} time* for day {{ day }}/12/{{ year }}:\n\
                 {% endif %}
-                {%- for (name, time) in ranking %}\n\
-                 • {{name}} \t {{time}}
+                {%- for (prefix, name, time) in ranking %}\n\
+                    {{prefix}} in ⏱️ {{time}} 👉🏻 *{{name}}*
                 {%- endfor %}"
             }
             MessageTemplate::Hero => {

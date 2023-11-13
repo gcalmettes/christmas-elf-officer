@@ -1,7 +1,10 @@
 use crate::{
     client::aoc::AoC,
     config,
-    core::events::Event,
+    core::{
+        events::Event,
+        standings::{standings_time, Ranking},
+    },
     error::{BotError, BotResult},
     storage::MemoryCache,
     utils::{compute_highlights, current_year_day, get_new_members},
@@ -24,6 +27,7 @@ pub enum JobProcess<'schedule> {
     UpdatePrivateLeaderboard(&'schedule str),
     WatchGlobalLeaderboard(&'schedule str),
     ParseDailyChallenge(&'schedule str),
+    SendDailySummary(&'schedule str),
 }
 
 impl Scheduler {
@@ -54,6 +58,9 @@ impl Scheduler {
             }
             JobProcess::ParseDailyChallenge(schedule) => {
                 parse_daily_challenge_job(schedule, self.sender.clone()).await?
+            }
+            JobProcess::SendDailySummary(schedule) => {
+                send_daily_summary_job(schedule, self.cache.clone(), self.sender.clone()).await?
             }
         };
         Ok(self.scheduler.add(job).await?)
@@ -343,6 +350,46 @@ async fn parse_daily_challenge_job(schedule: &str, sender: Arc<Sender<Event>>) -
                     error!("{error}");
                 }
             };
+        })
+    })?;
+    Ok(job)
+}
+
+async fn send_daily_summary_job(
+    schedule: &str,
+    cache: MemoryCache,
+    sender: Arc<Sender<Event>>,
+) -> BotResult<Job> {
+    let job = Job::new_async(schedule, move |uuid, mut l| {
+        let cache = cache.clone();
+        let sender = sender.clone();
+        Box::pin(async move {
+            let (year, day) = current_year_day();
+            let (p1, p2, delta) = {
+                let leaderboard = cache.data.lock().unwrap();
+                // let ranking = Ranking::PART2;
+
+                let p1 = standings_time(&Ranking::PART1, &leaderboard.leaderboard, year, day);
+                let p2 = standings_time(&Ranking::PART2, &leaderboard.leaderboard, year, day);
+                let delta = standings_time(&Ranking::DELTA, &leaderboard.leaderboard, year, day);
+                (p1, p2, delta)
+            };
+
+            if let Err(e) = sender
+                .send(Event::DailySummary(year, day, p1, p2, delta))
+                .await
+            {
+                let error =
+                    BotError::ChannelSend(format!("Could not send message to MPSC channel. {e}"));
+                error!("{error}");
+            };
+
+            // Query the next execution time for this job
+            let next_tick = l.next_tick_for_job(uuid).await;
+            match next_tick {
+                Ok(Some(ts)) => info!("Next refresh for private leaderboard at {:?}", ts),
+                _ => error!("Could not get next tick for refresh private leaderboard job"),
+            }
         })
     })?;
     Ok(job)
