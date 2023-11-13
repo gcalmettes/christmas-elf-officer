@@ -174,7 +174,8 @@ async fn push_events_socket_mode_function(
 
                             let cmd = {
                                 let data = cache.data.lock().unwrap();
-                                Command::build_from(t, &data)
+                                // Safe unwrap as we already know it is a valid command
+                                Command::build_from(t, &data).unwrap()
                             };
 
                             let thread_ts = message.origin.ts; // to respond in thread
