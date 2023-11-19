@@ -2,7 +2,10 @@ use crate::{
     core::{
         display,
         leaderboard::ScrapedLeaderboard,
-        standings::{standings_board, standings_tdf, standings_time, Jersey, Ranking, Scoring},
+        standings::{
+            points_tdf, standings_board, standings_tdf, standings_time, Jersey, Ranking, Scoring,
+        },
+        templates::invalid_year_day_message,
     },
     utils::current_year_day,
 };
@@ -28,6 +31,7 @@ pub enum Command {
     Ranking(i32, u8, Vec<(String, String)>, DateTime<Utc>, Ranking),
     StandingTdf(i32, String, DateTime<Utc>, Jersey),
     LeaderboardDisplay(i32, String, DateTime<Utc>, Scoring),
+    NotValid(String),
 }
 
 impl Command {
@@ -72,15 +76,19 @@ impl Command {
                     .and_then(|d| d.parse::<u8>().ok())
                     .unwrap_or_else(|| current_year_day().1);
 
-                let data = standings_time(&ranking, &leaderboard.leaderboard, year, day);
+                if let Some(msg) = invalid_year_day_message(year, Some(day)) {
+                    Some(Command::NotValid(msg))
+                } else {
+                    let data = standings_time(&ranking, &leaderboard.leaderboard, year, day);
 
-                Some(Command::Ranking(
-                    year,
-                    day,
-                    data,
-                    leaderboard.timestamp,
-                    ranking,
-                ))
+                    Some(Command::Ranking(
+                        year,
+                        day,
+                        data,
+                        leaderboard.timestamp,
+                        ranking,
+                    ))
+                }
             }
             Some(cmd) if cmd == &COMMANDS[2] => {
                 let scoring_str = parsed
@@ -93,14 +101,18 @@ impl Command {
                     .and_then(|d| d.parse::<i32>().ok())
                     .unwrap_or_else(|| current_year_day().0);
 
-                let data = standings_board(&scoring, &leaderboard.leaderboard, year);
-                let formatted = display::board(data);
-                Some(Command::LeaderboardDisplay(
-                    year,
-                    formatted,
-                    leaderboard.timestamp,
-                    scoring,
-                ))
+                if let Some(msg) = invalid_year_day_message(year, None) {
+                    Some(Command::NotValid(msg))
+                } else {
+                    let data = standings_board(&scoring, &leaderboard.leaderboard, year);
+                    let formatted = display::board(data);
+                    Some(Command::LeaderboardDisplay(
+                        year,
+                        formatted,
+                        leaderboard.timestamp,
+                        scoring,
+                    ))
+                }
             }
             Some(cmd) if cmd == &COMMANDS[3] => {
                 let jersey_str = parsed
@@ -112,15 +124,39 @@ impl Command {
                     .get("year")
                     .and_then(|d| d.parse::<i32>().ok())
                     .unwrap_or_else(|| current_year_day().0);
+                let day = parsed
+                    .get("day")
+                    .and_then(|d| d.parse::<u8>().ok())
+                    .unwrap_or_default(); // 0 by default => current standing for year
 
-                let data = standings_tdf(&jersey, &leaderboard.leaderboard, year);
-                let formatted = display::tdf(data);
-                Some(Command::StandingTdf(
-                    year,
-                    formatted,
-                    leaderboard.timestamp,
-                    jersey,
-                ))
+                if let Some(msg) = invalid_year_day_message(year, Some(day)) {
+                    Some(Command::NotValid(msg))
+                } else {
+                    let formatted = match (&jersey, day > 0) {
+                        // standing yearly
+                        (_, false) => {
+                            let data = standings_tdf(&jersey, &leaderboard.leaderboard, year);
+                            display::tdf(data)
+                        }
+                        // daily, based on time
+                        (Jersey::YELLOW, _) => {
+                            let data = standings_tdf(&jersey, &leaderboard.leaderboard, year);
+                            display::tdf(data)
+                        }
+                        // daily, base on points
+                        (_, _) => {
+                            let data = points_tdf(&jersey, &leaderboard.leaderboard, year, day);
+                            display::tdf_points(data)
+                        }
+                    };
+
+                    Some(Command::StandingTdf(
+                        year,
+                        formatted,
+                        leaderboard.timestamp,
+                        jersey,
+                    ))
+                }
             }
             _ => None,
         }

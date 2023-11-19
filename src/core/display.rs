@@ -62,6 +62,33 @@ pub fn tdf(entries: Vec<(&Identifier, i64, i64)>) -> String {
         .join("\n")
 }
 
+// Display tdf ranking
+pub fn tdf_points(entries: Vec<(&Identifier, usize)>) -> String {
+    // calculate width for positions
+    // the width of the maximum position to be displayed, plus one for ')'
+    let width_pos = entries.len().to_string().len();
+
+    // calculate width for names
+    // the length of the longest name, plus one for ':'
+    let width_name = 1 + entries
+        .iter()
+        .map(|(id, _)| id.name.len())
+        .max()
+        .unwrap_or_default();
+
+    entries
+        .iter()
+        .enumerate()
+        .map(|(idx, (id, points))| {
+            format!(
+                "{:>width_pos$}) {:<width_name$} {points}",
+                // idx is zero-based
+                idx + 1,
+                id.name,
+            )
+        })
+        .join("\n")
+}
 // Display board from given entries
 pub fn board(entries: Vec<(&Identifier, [(u8, usize); 25], usize)>) -> String {
     // calculate width for positions

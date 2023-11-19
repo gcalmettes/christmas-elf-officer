@@ -7,6 +7,10 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
+pub fn exponential_decay(max: f32, decay_rate: f32, time: i32) -> usize {
+    (max * (1.0 - decay_rate).powi(time)).round() as usize
+}
+
 pub fn ordinal_number_suffix(num: u8) -> &'static str {
     let s = num.to_string();
     if s.ends_with('1') && !s.ends_with("11") {
@@ -38,11 +42,11 @@ pub fn current_year_day() -> (i32, u8) {
         true => year,
         false => year - 1,
     };
-    let _day = now.day() as u8;
+    // let day = now.day() as u8;
     // (year, day)
 
     // TODO: remove fixed (year, day) used for dev purpose
-    (2022, 9)
+    (2022, 25)
 }
 
 pub fn format_duration(duration: Duration) -> String {
@@ -103,7 +107,11 @@ pub fn compute_highlights(current: &Leaderboard, new: &Leaderboard) -> Vec<DayHi
         target_year_day_combinations
             .iter()
             .fold(HashMap::new(), |mut acc, (year, day)| {
-                acc.extend(new.entries_per_year_day_member(*year, *day).into_iter());
+                let year_day_member = new
+                    .entries_per_member_for_year_day(*year, *day)
+                    .into_iter()
+                    .map(|(id, entries)| ((year, day, id), entries));
+                acc.extend(year_day_member);
                 acc
             });
 
@@ -128,7 +136,7 @@ pub fn compute_highlights(current: &Leaderboard, new: &Leaderboard) -> Vec<DayHi
 
                     // compute delta if any
                     let (year, day) = (year, d);
-                    let hits = entries_of_interest.get(&(*year, *day, &id)).unwrap();
+                    let hits = entries_of_interest.get(&(year, day, &id)).unwrap();
                     // compute delta
                     let durations = hits
                         .iter()
