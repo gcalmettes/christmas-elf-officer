@@ -29,7 +29,7 @@ static REGEX_COMMANDS: Lazy<Regex> =
 pub enum Command {
     Help,
     Ranking(i32, u8, Vec<(String, String)>, DateTime<Utc>, Ranking),
-    StandingTdf(i32, String, DateTime<Utc>, Jersey),
+    StandingTdf(i32, Option<u8>, String, DateTime<Utc>, Jersey),
     LeaderboardDisplay(i32, String, DateTime<Utc>, Scoring),
     NotValid(String),
 }
@@ -124,17 +124,14 @@ impl Command {
                     .get("year")
                     .and_then(|d| d.parse::<i32>().ok())
                     .unwrap_or_else(|| current_year_day().0);
-                let day = parsed
-                    .get("day")
-                    .and_then(|d| d.parse::<u8>().ok())
-                    .unwrap_or_default(); // 0 by default => current standing for year
+                let day = parsed.get("day").and_then(|d| d.parse::<u8>().ok());
 
-                if let Some(msg) = invalid_year_day_message(year, Some(day)) {
+                if let Some(msg) = invalid_year_day_message(year, day) {
                     Some(Command::NotValid(msg))
                 } else {
-                    let formatted = match (&jersey, day > 0) {
+                    let formatted = match (&jersey, day) {
                         // standing yearly
-                        (_, false) => {
+                        (_, None) => {
                             let data = standings_tdf(&jersey, &leaderboard.leaderboard, year);
                             display::tdf(data)
                         }
@@ -144,7 +141,7 @@ impl Command {
                             display::tdf(data)
                         }
                         // daily, base on points
-                        (_, _) => {
+                        (_, Some(day)) => {
                             let data = points_tdf(&jersey, &leaderboard.leaderboard, year, day);
                             display::tdf_points(data)
                         }
@@ -152,6 +149,7 @@ impl Command {
 
                     Some(Command::StandingTdf(
                         year,
+                        day,
                         formatted,
                         leaderboard.timestamp,
                         jersey,

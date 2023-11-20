@@ -258,7 +258,7 @@ impl fmt::Display for Event {
                                 .unwrap()
                         )
                     }
-                    Command::StandingTdf(year, standings, time, jersey) => {
+                    Command::StandingTdf(year, day, standings, time, jersey) => {
                         let now = time.with_timezone(&Local);
                         let timestamp = format!("{}", now.format("%d/%m/%Y %H:%M:%S"));
 
@@ -269,6 +269,7 @@ impl fmt::Display for Event {
                                 .get()
                                 .render(context! {
                                     year => year,
+                                    day => day,
                                     current_year => year == &now.year(),
                                     timestamp => timestamp,
                                     standings => standings,

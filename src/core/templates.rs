@@ -177,10 +177,12 @@ impl MessageTemplate {
                 ```{{ leaderboard }}```"
             }
             MessageTemplate::TdfStandings => {
-                "{%- if current_year -%}
-                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings as of {{timestamp}}:\n\
-                {%- else -%}
+                "{%- if current_year and not day -%}
+                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Current Jersey standings as of {{timestamp}}:\n\
+                {%- elif not day -%}
                     🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings from the {{ year }} event:\n\
+                {%- else -%}
+                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings for day {{day}} of the {{ year }} event:\n\
                 {%- endif -%}
                 ```{{ standings }}```"
             }
