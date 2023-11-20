@@ -63,7 +63,7 @@ pub fn tdf(entries: Vec<(&Identifier, i64, i64)>) -> String {
 }
 
 // Display tdf ranking
-pub fn tdf_points(entries: Vec<(&Identifier, usize)>) -> String {
+pub fn tdf_points(entries: &Vec<(&Identifier, usize)>) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();

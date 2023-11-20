@@ -3,7 +3,7 @@ use crate::{
     config,
     core::{
         events::Event,
-        standings::{standings_time, Ranking},
+        standings::{Ranking, Standing},
     },
     error::{BotError, BotResult},
     storage::MemoryCache,
@@ -367,11 +367,10 @@ async fn send_daily_summary_job(
             let (year, day) = current_year_day();
             let (p1, p2, delta) = {
                 let leaderboard = cache.data.lock().unwrap();
-                // let ranking = Ranking::PART2;
-
-                let p1 = standings_time(&Ranking::PART1, &leaderboard.leaderboard, year, day);
-                let p2 = standings_time(&Ranking::PART2, &leaderboard.leaderboard, year, day);
-                let delta = standings_time(&Ranking::DELTA, &leaderboard.leaderboard, year, day);
+                let standings = Standing::new(&leaderboard.leaderboard);
+                let p1 = standings.by_time(&Ranking::PART1, year, day);
+                let p2 = standings.by_time(&Ranking::PART2, year, day);
+                let delta = standings.by_time(&Ranking::DELTA, year, day);
                 (p1, p2, delta)
             };
 

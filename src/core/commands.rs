@@ -2,9 +2,7 @@ use crate::{
     core::{
         display,
         leaderboard::ScrapedLeaderboard,
-        standings::{
-            points_tdf, standings_board, standings_tdf, standings_time, Jersey, Ranking, Scoring,
-        },
+        standings::{standings_board, Jersey, Ranking, Scoring, Standing},
         templates::invalid_year_day_message,
     },
     utils::current_year_day,
@@ -79,7 +77,7 @@ impl Command {
                 if let Some(msg) = invalid_year_day_message(year, Some(day)) {
                     Some(Command::NotValid(msg))
                 } else {
-                    let data = standings_time(&ranking, &leaderboard.leaderboard, year, day);
+                    let data = Standing::new(&leaderboard.leaderboard).by_time(&ranking, year, day);
 
                     Some(Command::Ranking(
                         year,
@@ -132,18 +130,21 @@ impl Command {
                     let formatted = match (&jersey, day) {
                         // standing yearly
                         (_, None) => {
-                            let data = standings_tdf(&jersey, &leaderboard.leaderboard, year);
+                            let standings = Standing::new(&leaderboard.leaderboard);
+                            let data = standings.tdf_season(&jersey, year);
                             display::tdf(data)
                         }
                         // daily, based on time
                         (Jersey::YELLOW, _) => {
-                            let data = standings_tdf(&jersey, &leaderboard.leaderboard, year);
+                            let standings = Standing::new(&leaderboard.leaderboard);
+                            let data = standings.tdf_season(&jersey, year);
                             display::tdf(data)
                         }
                         // daily, base on points
                         (_, Some(day)) => {
-                            let data = points_tdf(&jersey, &leaderboard.leaderboard, year, day);
-                            display::tdf_points(data)
+                            let standings = Standing::new(&leaderboard.leaderboard);
+                            let data = standings.by_points(&jersey, year, day);
+                            display::tdf_points(&data)
                         }
                     };
 
