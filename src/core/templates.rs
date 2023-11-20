@@ -83,7 +83,7 @@ impl MessageTemplate {
                 but individual `p1` and `p2` rankings are also available. Note that you can also access the \
                 ranking of the closest finishes before cuttoff (i.e.: the least amount of time before the next puzzle release) \
                 with the `limit` method (those times are used to attribute points for the `!tdf combativity` jersey). \
-                If no day and/or year is set, the current day is automatically defined.`\n\n\
+                If no day and/or year is set, the current day/or year is automatically defined.`\n\n\
                 👉 📊 *Show me the board!*\n\
                 ```!board [ranking method] [year]```\n\
                 Current score and stars completion for the year, shown as a neat ascii board. Default is ranking by `local` \
@@ -214,6 +214,15 @@ pub fn invalid_year_day_message(year: i32, day: Option<u8>) -> Option<String> {
             *Come back in {delta} year{}* to discover the standings for *{year}*!",
             potential_s
         ));
+    };
+
+    // specific case of zero
+    if day == Some(0) {
+        return Some(
+            "Mmmhhh, looks like you wrote too much Python 🐍 and are now convinced that everything is zero-indexed, \
+            but in real-life the first day of the month is one 1️⃣."
+                .to_string(),
+        );
     };
 
     // after Christmas
