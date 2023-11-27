@@ -135,10 +135,12 @@ impl Command {
                             display::tdf(data)
                         }
                         // daily, based on time
-                        (Jersey::YELLOW, _) => {
+                        (Jersey::YELLOW, Some(day)) => {
+                            // TODO: make sure this is correct
                             let standings = Standing::new(&leaderboard.leaderboard);
-                            let data = standings.tdf_season(&jersey, year);
-                            display::tdf(data)
+                            let data = standings.by_time(&Ranking::PART2, year, day);
+                            //TODO: update this display
+                            display::tdf_time(&data)
                         }
                         // daily, base on points
                         (_, Some(day)) => {

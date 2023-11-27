@@ -1,4 +1,7 @@
-use crate::error::{BotError, BotResult};
+use crate::{
+    core::standings::Ranking,
+    error::{BotError, BotResult},
+};
 use chrono::{naive::NaiveDateTime, DateTime, Duration, TimeZone, Utc};
 use itertools::{Itertools, MinMaxResult};
 use scraper::{Node, Selector};
@@ -12,12 +15,6 @@ use std::{
 
 static AOC_PUZZLE_UTC_STARTING_HOUR: u32 = 5;
 static AOC_MONTH: u32 = 12;
-
-enum Ranking {
-    DELTA,
-    PART1,
-    PART2,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd, Serialize)]
 pub enum ProblemPart {
@@ -435,7 +432,7 @@ impl Leaderboard {
             .into_group_map_by(|a| (a.day, a.part))
     }
 
-    fn entries_per_day_member_for_year(
+    pub fn entries_per_day_member_for_year(
         &self,
         year: i32,
     ) -> HashMap<(u8, &Identifier), Vec<&Entry>> {
@@ -492,68 +489,70 @@ impl Leaderboard {
             .collect::<HashMap<(u8, ProblemPart), Vec<&Identifier>>>()
     }
 
-    /// day => [ordered members]
-    fn ranked_members_per_day_for_year(
-        &self,
-        ranking_method: Ranking,
-        year: i32,
-    ) -> HashMap<(u8, Option<ProblemPart>), Vec<&Identifier>> {
-        match ranking_method {
-            Ranking::DELTA => {
-                //something
-                //self.entries_per_day_member_for_year(year)
-                0
-            }
-            Ranking::PART1 => {
-                //something
-                0
-            }
-            Ranking::PART2 => {
-                //something
-                0
-            }
-        };
+    // TODO: cleanup !!!
 
-        // leaderboard
-        //     .iter()
-        //     .filter(|s| s.year == year && s.day == day)
-        //     .into_group_map_by(|s| &s.id)
-        //     .into_iter()
-        //     .filter_map(|(id, entries_for_day)| match ranking_type {
-        //         Ranking::DELTA => {
-        //             compute_delta(&entries_for_day).and_then(|duration| Some((id, duration)))
-        //         }
-        //         Ranking::PART1 => get_time_for_part(&entries_for_day, Ranking::PART1)
-        //             .and_then(|duration| Some((id, duration))),
-        //         Ranking::PART2 => get_time_for_part(&entries_for_day, Ranking::PART2)
-        //             .and_then(|duration| Some((id, duration))),
-        //     })
-        //     // .sorted_unstable_by(|(id, duration)| duration)
-        //     .sorted_unstable_by(|a, b| a.1.cmp(&b.1))
-        //     .map(|(id, duration)| (id.name.clone(), format_duration(duration)))
-        //     .collect::<Vec<_>>()
+    ///// day => [ordered members]
+    //fn ranked_members_per_day_for_year(
+    //    &self,
+    //    ranking_method: Ranking,
+    //    year: i32,
+    //) -> HashMap<(u8, Option<ProblemPart>), Vec<&Identifier>> {
+    //    match ranking_method {
+    //        Ranking::DELTA => {
+    //            //something
+    //            //self.entries_per_day_member_for_year(year)
+    //            0
+    //        }
+    //        Ranking::PART1 => {
+    //            //something
+    //            0
+    //        }
+    //        Ranking::PART2 => {
+    //            //something
+    //            0
+    //        }
+    //    };
 
-        // let grouped = match ranking_method {
-        //     Ranking::DELTA => self.entries_per_day_member_for_year(year),
-        //     _ => self.entries_per_day_part_for_year(year),
-        // };
-        // self.entries_per_day_part_for_year(year)
-        //     .into_iter()
-        //     .map(|(challenge, entries)| {
-        //         (
-        //             challenge,
-        //             entries
-        //                 .into_iter()
-        //                 // sort solutions chronologically by timestamp
-        //                 .sorted_unstable()
-        //                 // retrieve author of the solution
-        //                 .map(|s| &s.id)
-        //                 .collect(),
-        //         )
-        //     })
-        //     .collect::<HashMap<(u8, ProblemPart), Vec<&Identifier>>>()
-        HashMap::new()
-    }
+    //    // leaderboard
+    //    //     .iter()
+    //    //     .filter(|s| s.year == year && s.day == day)
+    //    //     .into_group_map_by(|s| &s.id)
+    //    //     .into_iter()
+    //    //     .filter_map(|(id, entries_for_day)| match ranking_type {
+    //    //         Ranking::DELTA => {
+    //    //             compute_delta(&entries_for_day).and_then(|duration| Some((id, duration)))
+    //    //         }
+    //    //         Ranking::PART1 => get_time_for_part(&entries_for_day, Ranking::PART1)
+    //    //             .and_then(|duration| Some((id, duration))),
+    //    //         Ranking::PART2 => get_time_for_part(&entries_for_day, Ranking::PART2)
+    //    //             .and_then(|duration| Some((id, duration))),
+    //    //     })
+    //    //     // .sorted_unstable_by(|(id, duration)| duration)
+    //    //     .sorted_unstable_by(|a, b| a.1.cmp(&b.1))
+    //    //     .map(|(id, duration)| (id.name.clone(), format_duration(duration)))
+    //    //     .collect::<Vec<_>>()
+
+    //    // let grouped = match ranking_method {
+    //    //     Ranking::DELTA => self.entries_per_day_member_for_year(year),
+    //    //     _ => self.entries_per_day_part_for_year(year),
+    //    // };
+    //    // self.entries_per_day_part_for_year(year)
+    //    //     .into_iter()
+    //    //     .map(|(challenge, entries)| {
+    //    //         (
+    //    //             challenge,
+    //    //             entries
+    //    //                 .into_iter()
+    //    //                 // sort solutions chronologically by timestamp
+    //    //                 .sorted_unstable()
+    //    //                 // retrieve author of the solution
+    //    //                 .map(|s| &s.id)
+    //    //                 .collect(),
+    //    //         )
+    //    //     })
+    //    //     .collect::<HashMap<(u8, ProblemPart), Vec<&Identifier>>>()
+    //    HashMap::new()
+    //}
 
     fn min_max_times_for_year_day(
         &self,

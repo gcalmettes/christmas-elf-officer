@@ -3,7 +3,7 @@ use crate::{
     config,
     core::{
         events::Event,
-        standings::{Ranking, Standing},
+        standings::{Jersey, Ranking, Standing},
     },
     error::{BotError, BotResult},
     storage::MemoryCache,
@@ -153,6 +153,19 @@ async fn update_private_leaderboard_job(
                     // Scoped to force 'current_leaderboard' to drop before 'await' so future can be Send.
                     let (highlights, new_members) = {
                         let mut current_leaderboard = cache.data.lock().unwrap();
+
+                        // TODO: remove
+                        // let s = Standing::new(&current_leaderboard.leaderboard);
+                        // let d = s.tdf_season2(&Jersey::COMBATIVE, 2022);
+                        // let (w1, w2, w3) = (20, 8, 8);
+                        // for (id, a, b) in d {
+                        //     println!("{:>w1$} {:<w2$} {:<w3$}", id.name, a, b);
+                        // }
+                        // println!("");
+                        // let s2 = s.by_points(&Jersey::COMBATIVE, 2022, 1);
+                        // for (id, a) in s2 {
+                        //     println!("{:>w1$} {:<w2$}", id.name, a);
+                        // }
 
                         // Check for new parts completions
                         let highlights = compute_highlights(

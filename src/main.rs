@@ -8,6 +8,9 @@ use core::events::Event;
 use scheduler::{JobProcess, Scheduler};
 use storage::MemoryCache;
 
+use std::time::Duration;
+use tokio::time;
+
 pub mod cli;
 pub mod client;
 pub mod config;
@@ -50,12 +53,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let jobs = vec![
         JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
-                                                  // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
-                                                  // JobProcess::UpdatePrivateLeaderboard("1/10 * * * * *"),
-                                                  // JobProcess::InitializeDailySolutionsThread("1/15 * * * * *"),
-                                                  // JobProcess::WatchGlobalLeaderboard("1/30 * * * * *"),
-                                                  // JobProcess::ParseDailyChallenge("1/20 * * * * *"),
-                                                  // JobProcess::SendDailySummary("1/20 * * * * *"),
+        // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
+        JobProcess::UpdatePrivateLeaderboard("1/10 * * * * *"),
+        // JobProcess::InitializeDailySolutionsThread("1/15 * * * * *"),
+        // JobProcess::WatchGlobalLeaderboard("1/30 * * * * *"),
+        // JobProcess::ParseDailyChallenge("1/20 * * * * *"),
+        // JobProcess::SendDailySummary("1/20 * * * * *"),
     ];
     for job in jobs {
         sched.add_job(job).await?;
@@ -65,6 +68,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     sched.start().await?;
 
     info!("Initializing messaging engine.");
+
+    // TODO: remove when tests are over
+    // let mut interval = time::interval(Duration::from_secs(10));
+    // loop {
+    //     interval.tick().await;
+    // }
     let slack_client = AoCSlackClient::new();
     slack_client
         .handle_messages_and_events(cache, tx, rx)
