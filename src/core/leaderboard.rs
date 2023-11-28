@@ -1,4 +1,7 @@
-use crate::error::{BotError, BotResult};
+use crate::{
+    core::standings::Ranking,
+    error::{BotError, BotResult},
+};
 use chrono::{naive::NaiveDateTime, DateTime, Duration, TimeZone, Utc};
 use itertools::{Itertools, MinMaxResult};
 use scraper::{Node, Selector};
@@ -202,6 +205,12 @@ impl Entry {
         let release_time = Entry::puzzle_unlock(self.year, self.day)?;
         Ok(self.timestamp - release_time)
     }
+
+    pub fn duration_until_next_release(&self) -> BotResult<Duration> {
+        // NOTE: this is only correct for 30 first days of december
+        let next_release_time = Entry::puzzle_unlock(self.year, self.day + 1)?;
+        Ok(next_release_time - self.timestamp)
+    }
 }
 
 impl Leaderboard {
@@ -216,20 +225,20 @@ impl Leaderboard {
     }
 
     /// (year, day, member) => (unordered) stars
-    pub fn entries_per_year_day_member(
+    pub fn entries_per_member_for_year_day(
         &self,
         year: i32,
         day: u8,
-    ) -> HashMap<(i32, u8, &Identifier), Vec<&Entry>> {
+    ) -> HashMap<&Identifier, Vec<&Entry>> {
         self.iter()
             .filter(|s| s.year == year && s.day == day)
-            .into_group_map_by(|e| (e.year, e.day, &e.id))
+            .into_group_map_by(|e| &e.id)
     }
 
     /// (year, id) => [score per day for that year]
     pub fn daily_scores_per_year_member(&self) -> HashMap<(i32, &Identifier), [usize; 25]> {
         // Max point earned for each star is number of members in leaderboard
-        let members_solutions = self.entries_per_year_member();
+        let members_solutions = self.iter().into_group_map_by(|a| (a.year, &a.id));
         let n_members_per_year = members_solutions
             .iter()
             .map(|((y, id), _)| (y, id))
@@ -255,12 +264,15 @@ impl Leaderboard {
     }
 
     /// id => [score per day for that year]
-    pub fn daily_parts_scores_per_member_for_year(
+    pub fn daily_stars_and_scores_per_member_for_year(
         &self,
         year: i32,
     ) -> HashMap<&Identifier, [(u8, usize); 25]> {
         // Max point earned for each star is number of members in leaderboard
-        let members_solutions = self.entries_per_member_for_year(year);
+        let members_solutions = self
+            .iter()
+            .filter(|e| e.year == year)
+            .into_group_map_by(|a| &a.id);
         let n_members = members_solutions.len();
 
         let standings_per_challenge = self.ranked_members_per_day_part_for_year(year);
@@ -275,6 +287,69 @@ impl Leaderboard {
                         let day_stars_scores = acc.entry(id).or_insert([(0, 0); 25]);
                         day_stars_scores[(*day - 1) as usize].0 += 1;
                         day_stars_scores[(*day - 1) as usize].1 += star_score;
+                    });
+                acc
+            })
+    }
+
+    /// id => [(delta time, rank, score for that rank) for each day]
+    pub fn daily_delta_and_scores_per_member_for_year(
+        &self,
+        year: i32,
+    ) -> HashMap<&Identifier, [(Duration, usize, usize); 25]> {
+        // let entries_per_day_member = self
+        //     .iter()
+        //     .filter(|e| e.year == year)
+        //     .into_group_map_by(|a| (a.day, &a.id));
+        let entries_per_day_member = self.entries_per_day_member_for_year(year);
+
+        // Max point earned for each star is number of members in leaderboard
+        let n_members = entries_per_day_member
+            .iter()
+            .map(|((_day, id), _entries)| id)
+            .unique()
+            .count();
+
+        let members_delta = entries_per_day_member
+            .into_iter()
+            // only keep completed days (2 parts)
+            .filter_map(|((day, id), entries)| match entries.len() {
+                1 => None,
+                2 => {
+                    let mut sorted = entries.into_iter().sorted_unstable();
+                    let (p1, p2) = (sorted.next().unwrap(), sorted.next().unwrap());
+                    let delta = p2.timestamp - p1.timestamp;
+                    Some((day, id, delta))
+                }
+                _ => unreachable!(),
+            })
+            .collect::<Vec<(u8, &Identifier, Duration)>>();
+
+        members_delta
+            .iter()
+            .into_group_map_by(|(day, _id, _delta)| day)
+            .into_iter()
+            .map(|(day, deltas)| {
+                (
+                    day,
+                    deltas
+                        .into_iter()
+                        .sorted_unstable_by_key(|(_day, _id, delta)| delta)
+                        .map(|(_day, id, delta)| (id, delta))
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .fold(HashMap::new(), |mut acc, (day, sorted_deltas)| {
+                sorted_deltas
+                    .iter()
+                    .enumerate()
+                    .for_each(|(rank_minus_one, (id, delta))| {
+                        // unwrap is safe here as we know the year exists
+                        let delta_score = n_members - rank_minus_one;
+                        let day_scores =
+                            acc.entry(*id).or_insert([(Duration::seconds(0), 0, 0); 25]);
+                        day_scores[(*day - 1) as usize] =
+                            (**delta, rank_minus_one + 1, delta_score);
                     });
                 acc
             })
@@ -346,26 +421,24 @@ impl Leaderboard {
         self.len() == n
     }
 
-    /// (year, member) => (unordered) stars
-    fn entries_per_year_member(&self) -> HashMap<(i32, &Identifier), Vec<&Entry>> {
-        self.iter().into_group_map_by(|a| (a.year, &a.id))
-    }
-
-    /// (year, member) => (unordered) stars
-    fn entries_per_member_for_year(&self, year: i32) -> HashMap<&Identifier, Vec<&Entry>> {
-        self.iter()
-            .filter(|e| e.year == year)
-            .into_group_map_by(|a| &a.id)
-    }
-
     /// (year, day, part) => (unordered) stars
     fn entries_per_year_day_part(&self) -> HashMap<(i32, u8, ProblemPart), Vec<&Entry>> {
         self.iter().into_group_map_by(|a| (a.year, a.day, a.part))
     }
+
     fn entries_per_day_part_for_year(&self, year: i32) -> HashMap<(u8, ProblemPart), Vec<&Entry>> {
         self.iter()
             .filter(|e| e.year == year)
             .into_group_map_by(|a| (a.day, a.part))
+    }
+
+    pub fn entries_per_day_member_for_year(
+        &self,
+        year: i32,
+    ) -> HashMap<(u8, &Identifier), Vec<&Entry>> {
+        self.iter()
+            .filter(|e| e.year == year)
+            .into_group_map_by(|a| (a.day, &a.id))
     }
 
     /// all members ids
@@ -394,6 +467,7 @@ impl Leaderboard {
             .collect::<HashMap<(i32, u8, ProblemPart), Vec<&Identifier>>>()
     }
 
+    /// (day, part) => [ordered members]
     fn ranked_members_per_day_part_for_year(
         &self,
         year: i32,
@@ -414,6 +488,71 @@ impl Leaderboard {
             })
             .collect::<HashMap<(u8, ProblemPart), Vec<&Identifier>>>()
     }
+
+    // TODO: cleanup !!!
+
+    ///// day => [ordered members]
+    //fn ranked_members_per_day_for_year(
+    //    &self,
+    //    ranking_method: Ranking,
+    //    year: i32,
+    //) -> HashMap<(u8, Option<ProblemPart>), Vec<&Identifier>> {
+    //    match ranking_method {
+    //        Ranking::DELTA => {
+    //            //something
+    //            //self.entries_per_day_member_for_year(year)
+    //            0
+    //        }
+    //        Ranking::PART1 => {
+    //            //something
+    //            0
+    //        }
+    //        Ranking::PART2 => {
+    //            //something
+    //            0
+    //        }
+    //    };
+
+    //    // leaderboard
+    //    //     .iter()
+    //    //     .filter(|s| s.year == year && s.day == day)
+    //    //     .into_group_map_by(|s| &s.id)
+    //    //     .into_iter()
+    //    //     .filter_map(|(id, entries_for_day)| match ranking_type {
+    //    //         Ranking::DELTA => {
+    //    //             compute_delta(&entries_for_day).and_then(|duration| Some((id, duration)))
+    //    //         }
+    //    //         Ranking::PART1 => get_time_for_part(&entries_for_day, Ranking::PART1)
+    //    //             .and_then(|duration| Some((id, duration))),
+    //    //         Ranking::PART2 => get_time_for_part(&entries_for_day, Ranking::PART2)
+    //    //             .and_then(|duration| Some((id, duration))),
+    //    //     })
+    //    //     // .sorted_unstable_by(|(id, duration)| duration)
+    //    //     .sorted_unstable_by(|a, b| a.1.cmp(&b.1))
+    //    //     .map(|(id, duration)| (id.name.clone(), format_duration(duration)))
+    //    //     .collect::<Vec<_>>()
+
+    //    // let grouped = match ranking_method {
+    //    //     Ranking::DELTA => self.entries_per_day_member_for_year(year),
+    //    //     _ => self.entries_per_day_part_for_year(year),
+    //    // };
+    //    // self.entries_per_day_part_for_year(year)
+    //    //     .into_iter()
+    //    //     .map(|(challenge, entries)| {
+    //    //         (
+    //    //             challenge,
+    //    //             entries
+    //    //                 .into_iter()
+    //    //                 // sort solutions chronologically by timestamp
+    //    //                 .sorted_unstable()
+    //    //                 // retrieve author of the solution
+    //    //                 .map(|s| &s.id)
+    //    //                 .collect(),
+    //    //         )
+    //    //     })
+    //    //     .collect::<HashMap<(u8, ProblemPart), Vec<&Identifier>>>()
+    //    HashMap::new()
+    //}
 
     fn min_max_times_for_year_day(
         &self,
@@ -453,37 +592,34 @@ impl Leaderboard {
             ))?;
 
         let standings = self
-            .entries_per_year_day_member(year, day)
+            .entries_per_member_for_year_day(year, day)
             .into_iter()
-            .filter_map(
-                |((_year, _day, id), solutions_for_day)| match solutions_for_day.len() {
-                    1 => {
-                        // unwrap is safe as len == 1
-                        let entry = solutions_for_day.last().unwrap();
-                        match entry.part {
-                            ProblemPart::FIRST => None,
-                            ProblemPart::SECOND => {
-                                // Overtimed on first part, but came back strong to score second part
-                                // Duration is > (part.1, - max first part). We'll substract 1 sec.
-                                Some((
-                                    &id.name,
-                                    entry.timestamp - max_time_first_part - Duration::seconds(1),
-                                    entry.rank,
-                                ))
-                            }
+            .filter_map(|(id, solutions_for_day)| match solutions_for_day.len() {
+                1 => {
+                    // unwrap is safe as len == 1
+                    let entry = solutions_for_day.last().unwrap();
+                    match entry.part {
+                        ProblemPart::FIRST => None,
+                        ProblemPart::SECOND => {
+                            // Overtimed on first part, but came back strong to score second part
+                            // Duration is > (part.1, - max first part). We'll substract 1 sec.
+                            Some((
+                                &id.name,
+                                entry.timestamp - max_time_first_part - Duration::seconds(1),
+                                entry.rank,
+                            ))
                         }
                     }
-                    2 => {
-                        let mut ordered_parts =
-                            solutions_for_day.iter().sorted_by_key(|s| s.timestamp);
-                        // safe unwrap since len == 2
-                        let (first, second) =
-                            (ordered_parts.next().unwrap(), ordered_parts.next().unwrap());
-                        Some((&id.name, second.timestamp - first.timestamp, second.rank))
-                    }
-                    _ => unreachable!(),
-                },
-            )
+                }
+                2 => {
+                    let mut ordered_parts = solutions_for_day.iter().sorted_by_key(|s| s.timestamp);
+                    // safe unwrap since len == 2
+                    let (first, second) =
+                        (ordered_parts.next().unwrap(), ordered_parts.next().unwrap());
+                    Some((&id.name, second.timestamp - first.timestamp, second.rank))
+                }
+                _ => unreachable!(),
+            })
             .sorted_by_key(|r| r.1)
             .collect::<Vec<(&String, Duration, Option<u8>)>>();
         Ok(standings)

@@ -2,6 +2,7 @@ use crate::{
     core::{
         commands::Command,
         leaderboard::{LeaderboardStatistics, ProblemPart},
+        standings::Ranking,
         templates::MessageTemplate,
     },
     utils::{current_year_day, format_duration, format_rank, ordinal_number_suffix, DayHighlight},
@@ -196,6 +197,17 @@ impl fmt::Display for Event {
             }
             Event::CommandReceived(_channel_id, _ts, cmd) => {
                 match cmd {
+                    Command::NotValid(reason) => {
+                        write!(
+                            f,
+                            "{}",
+                            MessageTemplate::CustomMessage
+                                .get()
+                                .render(context! {
+                                message => reason})
+                                .unwrap()
+                        )
+                    }
                     Command::Help => {
                         write!(f, "{}", MessageTemplate::Help.get().render({}).unwrap())
                     }
@@ -221,7 +233,8 @@ impl fmt::Display for Event {
                                     current_day => year == &now.year() && *day as u32 == now.day(),
                                     timestamp => timestamp,
                                     ranking => prefixed_data,
-                                    ranking_method => method.to_string()
+                                    ranking_method => method.to_string(),
+                                    is_limit => match method {Ranking::LIMIT => true, _ => false},
                                 })
                                 .unwrap()
                         )
@@ -245,7 +258,7 @@ impl fmt::Display for Event {
                                 .unwrap()
                         )
                     }
-                    Command::StandingTdf(year, standings, time, jersey) => {
+                    Command::StandingTdf(year, day, standings, time, jersey) => {
                         let now = time.with_timezone(&Local);
                         let timestamp = format!("{}", now.format("%d/%m/%Y %H:%M:%S"));
 
@@ -256,6 +269,7 @@ impl fmt::Display for Event {
                                 .get()
                                 .render(context! {
                                     year => year,
+                                    day => day,
                                     current_year => year == &now.year(),
                                     timestamp => timestamp,
                                     standings => standings,

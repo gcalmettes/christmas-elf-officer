@@ -1,3 +1,8 @@
+use crate::{
+    core::leaderboard::Entry,
+    utils::{current_year_day, format_rank},
+};
+use chrono::{Duration, Utc};
 use minijinja::{Environment, Template};
 use once_cell::sync::Lazy;
 use strum::{EnumIter, IntoEnumIterator};
@@ -21,6 +26,7 @@ static TEMPLATES_ENVIRONMENT: Lazy<Environment> = Lazy::new(|| {
 #[derive(EnumIter)]
 pub enum MessageTemplate {
     Help,
+    CustomMessage,
     DailyChallenge,
     DailySolutionThread,
     DailySummary,
@@ -39,6 +45,7 @@ impl MessageTemplate {
     pub fn name(&self) -> &'static str {
         match self {
             MessageTemplate::Help => "help.txt",
+            MessageTemplate::CustomMessage => "custom.txt",
             MessageTemplate::DailyChallenge => "challenge.txt",
             MessageTemplate::DailySolutionThread => "solution_thread.txt",
             MessageTemplate::DailySummary => "summary.txt",
@@ -62,8 +69,6 @@ impl MessageTemplate {
         // \n\ at each code line end creates a line break at the proper position and discards further spaces in this line of code.
         // \x20 (hex; 32 in decimal) is an ASCII space and an indicator for the first space to be preserved in this line of the string.
 
-        // !fast [method] [day] [year]
-
         match self {
             MessageTemplate::Help => {
                 "🗒️ Nice work, you've found the *CEO commands handbook*.\n\
@@ -75,8 +80,10 @@ impl MessageTemplate {
                 👉 🏎️ *Fastest of the West!*\n\
                 ```!fast [ranking method] [day] [year]```\n\
                 Fastest time(s) for the day. By default, the ranking is based on the `delta` time for the day, \
-                but individual `p1` and `p2` rankings are also available. \
-                If no day and/or year is set, the current day is automatically defined.`\n\n\
+                but individual `p1` and `p2` rankings are also available. Note that you can also access the \
+                ranking of the closest finishes before cuttoff (i.e.: the least amount of time before the next puzzle release) \
+                with the `limit` method (those times are used to attribute points for the `!tdf combativity` jersey). \
+                If no day and/or year is set, the current day/or year is automatically defined.`\n\n\
                 👉 📊 *Show me the board!*\n\
                 ```!board [ranking method] [year]```\n\
                 Current score and stars completion for the year, shown as a neat ascii board. Default is ranking by `local` \
@@ -86,6 +93,9 @@ impl MessageTemplate {
                 Tour de France alternative standings! Come join the peloton and compete to earn `yellow` or `green` points. \
                 Default is ranking for the Yellow jersey for the current year.\
                 "
+            },
+            MessageTemplate::CustomMessage => {
+                "🙅 {{message}}"
             },
             MessageTemplate::DailyChallenge => {
                 "🎉 Today's challenge is up!\n\
@@ -147,9 +157,9 @@ impl MessageTemplate {
             }
             MessageTemplate::Ranking => {
                 "{% if current_day %}
-                    Today's fastest *{{ ranking_method }} time* (as of {{timestamp}}):\n\
+                    Today's {{'fastest' if not is_limit else 'closest'}} *{{ ranking_method }} time* (as of {{timestamp}}):\n\
                 {% else %}
-                    Fastest *{{ ranking_method }} time* for day {{ day }}/12/{{ year }}:\n\
+                    {{'Fastest' if not is_limit else 'Closest'}} *{{ ranking_method }} time* for day {{ day }}/12/{{ year }}:\n\
                 {% endif %}
                 {%- for (prefix, name, time) in ranking %}\n\
                     {{prefix}} in ⏱️ {{time}} 👉🏻 *{{name}}*
@@ -167,10 +177,12 @@ impl MessageTemplate {
                 ```{{ leaderboard }}```"
             }
             MessageTemplate::TdfStandings => {
-                "{%- if current_year -%}
-                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings as of {{timestamp}}:\n\
-                {%- else -%}
+                "{%- if current_year and not day -%}
+                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Current Jersey standings as of {{timestamp}}:\n\
+                {%- elif not day -%}
                     🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings from the {{ year }} event:\n\
+                {%- else -%}
+                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings for day {{day}} of the {{ year }} event:\n\
                 {%- endif -%}
                 ```{{ standings }}```"
             }
@@ -178,9 +190,85 @@ impl MessageTemplate {
     }
 }
 
-// year => year,
-// day => day,
-// current_year => year == &now.year(),
-// timestamp => timestamp,
-// ranking => data,
-// ranking_method => method.to_string()
+pub fn invalid_year_day_message(year: i32, day: Option<u8>) -> Option<String> {
+    // no AOC before 2015
+    if year < 2015 {
+        return Some(format!(
+            "I see that you are like me, loving the thrill of exploring old archives 🗃️!\n\
+            However, sorry to break it to you, but there is *no gem to be found in {year}* \
+            as the the AOC event only started in 2015..."
+        ));
+    };
+
+    let (current_year, current_day) = current_year_day();
+
+    // in the future
+    if year > current_year {
+        let delta = year - current_year;
+        let potential_s = match delta > 1 {
+            true => "s",
+            false => "",
+        };
+        return Some(format!(
+            "I like the enthusiam, but unfortunately I am no Nostradamus 🧙 and can't see in the future 🔮 ...\n\
+            *Come back in {delta} year{}* to discover the standings for *{year}*!",
+            potential_s
+        ));
+    };
+
+    // specific case of zero
+    if day == Some(0) {
+        return Some(
+            "Mmmhhh, looks like you wrote too much Python 🐍 and are now convinced that everything is zero-indexed, \
+            but in real-life the first day of the month is one 1️⃣."
+                .to_string(),
+        );
+    };
+
+    // after Christmas
+    if day > Some(25) {
+        return Some(
+            "You're definitely free to code after Christmas 🎄, but *AOC puzzles stop after the 25th*."
+                .to_string(),
+        );
+    };
+
+    match (
+        year == current_year,
+        day == Some(current_day),
+        day > Some(current_day),
+    ) {
+        // future day
+        (true, _, true) => {
+            // Safe since day is some
+            let day = day.unwrap();
+            let delta = day - current_day;
+            let potential_s = match delta > 1 {
+                true => "s",
+                false => "",
+            };
+            Some(format!(
+                "I know the suspense is unbearable, but I can't go faster than the music 🎶...\n\
+                *Come back in {delta} day{}* to see what's happening on December {}.",
+                potential_s,
+                format_rank(day)
+            ))
+        }
+        // it's today, make sure AOC puzzle was released
+        (true, true, _) => {
+            let now = Utc::now();
+            // safe unwrap since day is some
+            let day = day.unwrap();
+            Entry::puzzle_unlock(year, day)
+                .ok()
+                .and_then(|release_time| match now - release_time > Duration::seconds(0) {
+                    false => Some(
+                        "The wait is almost over ⌛, today's first puzzle will be released at 05:00 UTC!".to_string()
+                    ),
+                    // puzzle already released
+                    true => None,
+                })
+        }
+        (_, _, _) => None, // any other combination is valid
+    }
+}

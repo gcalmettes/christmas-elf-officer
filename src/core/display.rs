@@ -5,6 +5,7 @@ use crate::{
 use chrono::Duration;
 use itertools::Itertools;
 
+// TODO: probably need a tdf season instead of this one
 // Display tdf ranking
 pub fn tdf(entries: Vec<(&Identifier, i64, i64)>) -> String {
     // calculate width for positions
@@ -57,6 +58,101 @@ pub fn tdf(entries: Vec<(&Identifier, i64, i64)>) -> String {
                     (true, true) => format!("({penalties} stage out)"),
                     (false, _) => "(All stages)".to_string(),
                 }
+            )
+        })
+        .join("\n")
+}
+
+// TODO: merge with above depending on jersey
+pub fn tdf_season(entries: Vec<(&Identifier, i64, i64)>) -> String {
+    // calculate width for positions
+    // the width of the maximum position to be displayed, plus one for ')'
+    let width_pos = entries.len().to_string().len();
+
+    // calculate width for names
+    // the length of the longest name, plus one for ':'
+    let width_name = 1 + entries
+        .iter()
+        .map(|(id, _, _)| id.name.len())
+        .max()
+        .unwrap_or_default();
+
+    let width_score = 1 + entries
+        .iter()
+        .map(|(_, points, _)| points.to_string().len())
+        .max()
+        .unwrap_or_default();
+
+    // Max possible width for penalties
+    let width_scored = "(scored xx days)".len() + 1;
+
+    entries
+        .iter()
+        .enumerate()
+        .map(|(idx, (id, total_points, scored_days))| {
+            format!(
+                "{:>width_pos$}) {:<width_name$} {:>width_score$} {:>width_scored$}",
+                // idx is zero-based
+                idx + 1,
+                id.name,
+                total_points,
+                format!("(scored {:0>2} days)", scored_days),
+            )
+        })
+        .join("\n")
+}
+
+// Display tdf ranking, for points jersey
+pub fn tdf_points(entries: &Vec<(&Identifier, usize)>) -> String {
+    // calculate width for positions
+    // the width of the maximum position to be displayed, plus one for ')'
+    let width_pos = entries.len().to_string().len();
+
+    // calculate width for names
+    // the length of the longest name, plus one for ':'
+    let width_name = 1 + entries
+        .iter()
+        .map(|(id, _)| id.name.len())
+        .max()
+        .unwrap_or_default();
+
+    entries
+        .iter()
+        .enumerate()
+        .map(|(idx, (id, points))| {
+            format!(
+                "{:>width_pos$}) {:<width_name$} {points}",
+                // idx is zero-based
+                idx + 1,
+                id.name,
+            )
+        })
+        .join("\n")
+}
+
+// Display tdf ranking, for timed jersey
+pub fn tdf_time(entries: &Vec<(String, String)>) -> String {
+    // calculate width for positions
+    // the width of the maximum position to be displayed, plus one for ')'
+    let width_pos = entries.len().to_string().len();
+
+    // calculate width for names
+    // the length of the longest name, plus one for ':'
+    let width_name = 1 + entries
+        .iter()
+        .map(|(name, _)| name.len())
+        .max()
+        .unwrap_or_default();
+
+    entries
+        .iter()
+        .enumerate()
+        .map(|(idx, (name, time))| {
+            format!(
+                "{:>width_pos$}) {:<width_name$} {time}",
+                // idx is zero-based
+                idx + 1,
+                name,
             )
         })
         .join("\n")
