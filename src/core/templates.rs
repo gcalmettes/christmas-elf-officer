@@ -82,7 +82,7 @@ impl MessageTemplate {
                 Fastest time(s) for the day. By default, the ranking is based on the `delta` time for the day, \
                 but individual `p1` and `p2` rankings are also available. Note that you can also access the \
                 ranking of the closest finishes before cuttoff (i.e.: the least amount of time before the next puzzle release) \
-                with the `limit` method (those times are used to attribute points for the `!tdf combativity` jersey). \
+                with the `limit` method (those times are used to attribute points for the `!tdf combative` jersey). \
                 If no day and/or year is set, the current day/or year is automatically defined.`\n\n\
                 👉 📊 *Show me the board!*\n\
                 ```!board [ranking method] [year]```\n\
@@ -97,8 +97,8 @@ impl MessageTemplate {
                 7 days is applied for every day not fully solved, or any day taking longer to solve than the penalty time).\n\
                 - `green` jersey points are earned each day by going full blast between part 1 and part 2 ! The points attributed are \
                 based on the official Tour de France green jersey points.\n\
-                - `combative` jersey points are attributed each day to the brave soul showing grit by not throwing the towel and keeping \
-                their focus on finishing a day before the next one starts ... The closer from the cutoff, the more points earned !"
+                - `combative` jersey points are attributed each day to the brave soul showing grit by not throwing the towel too early and keeping \
+                their focus on finishing a day before the next one starts ... The closer to the cutoff, the more points earned !"
             },
             MessageTemplate::CustomMessage => {
                 "🙅 {{message}}"
