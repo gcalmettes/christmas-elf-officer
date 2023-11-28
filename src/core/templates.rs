@@ -89,18 +89,25 @@ impl MessageTemplate {
                 Current score and stars completion for the year, shown as a neat ascii board. Default is ranking by `local` \
                 score for the current year, but ranking by number of `stars` is also available.`\n\n\
                 👉 🚴 *The long haul!*\n\
-                ```!tdf [jersey color] [year]```\n\
-                Tour de France alternative standings! Come join the peloton and compete to earn `yellow` or `green` points. \
-                Default is ranking for the Yellow jersey for the current year.\
-                "
+                ```!tdf [jersey color] [day] [year]```\n\
+                Tour de France alternative standings! Come join the peloton and compete to earn `yellow` jersey credentials, \
+                or accumulate points for the coveted `green` or `combative` jerseys. \
+                Default is ranking for the Yellow jersey for the current year.\n\
+                - `yellow` jersey ranking is based on the accumulated time for the full (part 2) solve each day (a penalty of \
+                7 days is applied for every day not fully solved, or any day taking longer to solve than the penalty time).\n\
+                - `green` jersey points are earned each day by going full blast between part 1 and part 2 ! The points attributed are \
+                based on the official Tour de France green jersey points.\n\
+                - `combative` jersey points are attributed each day to the brave soul showing grit by not throwing the towel and keeping \
+                their focus on finishing a day before the next one starts ... The closer from the cutoff, the more points earned !"
             },
             MessageTemplate::CustomMessage => {
                 "🙅 {{message}}"
             },
             MessageTemplate::DailyChallenge => {
-                "🎉 Today's challenge is up!\n\
-                    \x20 *{{title}}*
-                "
+                "```{{header}}```\n\
+                🎉 Today's challenge is up!\n\
+                    \x20 *{{title}}*\n\
+                🔫 Go after it and get some fun, ⏱️ time is ticking !"
             },
             MessageTemplate::DailySolutionThread => {
                 "👇 *Daily discussion thread for day {{day}}*\n\
@@ -178,11 +185,11 @@ impl MessageTemplate {
             }
             MessageTemplate::TdfStandings => {
                 "{%- if current_year and not day -%}
-                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Current Jersey standings as of {{timestamp}}:\n\
+                    🚴 {{ '🟡 Yellow 🛵' if jersey=='yellow' else ('🟢 Green 🍏' if jersey=='green' else '⚫Combative 🥋')}} Jersey current standings as of {{timestamp}}:\n\
                 {%- elif not day -%}
-                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings from the {{ year }} event:\n\
+                    🚴 {{ '🟡 Yellow 🛵' if jersey=='yellow' else ('🟢 Green 🍏' if jersey=='green' else '⚫Combative 🥋')}} Jersey standings from the *{{year}}* event:\n\
                 {%- else -%}
-                    🚴 {{ '🟡🛵' if jersey=='yellow' else ('🟢' if jersey=='green' else '⚫')}} Jersey standings for day {{day}} of the {{ year }} event:\n\
+                    🚴 {{ '🟡 Yellow 🛵' if jersey=='yellow' else ('🟢 Green 🍏' if jersey=='green' else '⚫Combative 🥋')}} Jersey standings for *day {{day}}* of the {{year}} event:\n\
                 {%- endif -%}
                 ```{{ standings }}```"
             }

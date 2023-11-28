@@ -121,8 +121,7 @@ async fn initialize_daily_solutions_thread_job(
     let job = Job::new_async(schedule, move |_uuid, _l| {
         let sender = sender.clone();
         Box::pin(async move {
-            let now = Utc::now();
-            let day = now.day();
+            let (_year, day) = current_year_day();
             if let Err(e) = sender
                 .send(Event::DailySolutionsThreadToInitialize(day))
                 .await
@@ -351,7 +350,10 @@ async fn parse_daily_challenge_job(schedule: &str, sender: Arc<Sender<Event>>) -
             info!("Global Leaderboard for day {day} not complete yet.");
             match aoc_client.daily_challenge(year, day).await {
                 Ok(title) => {
-                    if let Err(e) = sender.send(Event::DailyChallengeIsUp(title.clone())).await {
+                    if let Err(e) = sender
+                        .send(Event::DailyChallengeIsUp(day, title.clone()))
+                        .await
+                    {
                         let error = BotError::ChannelSend(format!(
                             "Could not send message to MPSC channel. {e}"
                         ));

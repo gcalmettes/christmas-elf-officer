@@ -5,9 +5,7 @@ use crate::{
 use chrono::Duration;
 use itertools::Itertools;
 
-// TODO: probably need a tdf season instead of this one
-// Display tdf ranking
-pub fn tdf(entries: Vec<(&Identifier, i64, i64)>) -> String {
+pub fn tdf_time_yearly(entries: &Vec<(&Identifier, i64, i64)>) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();
@@ -63,8 +61,7 @@ pub fn tdf(entries: Vec<(&Identifier, i64, i64)>) -> String {
         .join("\n")
 }
 
-// TODO: merge with above depending on jersey
-pub fn tdf_season(entries: Vec<(&Identifier, i64, i64)>) -> String {
+pub fn tdf_points_yearly(entries: &Vec<(&Identifier, i64, i64)>) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();
@@ -77,7 +74,7 @@ pub fn tdf_season(entries: Vec<(&Identifier, i64, i64)>) -> String {
         .max()
         .unwrap_or_default();
 
-    let width_score = 1 + entries
+    let width_points = 1 + entries
         .iter()
         .map(|(_, points, _)| points.to_string().len())
         .max()
@@ -91,7 +88,7 @@ pub fn tdf_season(entries: Vec<(&Identifier, i64, i64)>) -> String {
         .enumerate()
         .map(|(idx, (id, total_points, scored_days))| {
             format!(
-                "{:>width_pos$}) {:<width_name$} {:>width_score$} {:>width_scored$}",
+                "{:>width_pos$}) {:<width_name$} {:>width_points$} {:>width_scored$}",
                 // idx is zero-based
                 idx + 1,
                 id.name,
@@ -102,8 +99,8 @@ pub fn tdf_season(entries: Vec<(&Identifier, i64, i64)>) -> String {
         .join("\n")
 }
 
-// Display tdf ranking, for points jersey
-pub fn tdf_points(entries: &Vec<(&Identifier, usize)>) -> String {
+// Daily points
+pub fn tdf_points_daily(entries: &Vec<(&Identifier, usize)>) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();
@@ -130,8 +127,8 @@ pub fn tdf_points(entries: &Vec<(&Identifier, usize)>) -> String {
         .join("\n")
 }
 
-// Display tdf ranking, for timed jersey
-pub fn tdf_time(entries: &Vec<(String, String)>) -> String {
+// Daily times
+pub fn tdf_time_daily(entries: &Vec<(String, String)>) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();

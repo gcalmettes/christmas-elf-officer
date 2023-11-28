@@ -7,12 +7,12 @@ use crate::{
     },
     utils::{current_year_day, format_duration, format_rank, ordinal_number_suffix, DayHighlight},
 };
-
 use chrono::{Datelike, Local};
 use itertools::Itertools;
 use minijinja::context;
 use slack_morphism::{SlackChannelId, SlackTs};
 use std::fmt;
+use text_to_ascii_art::convert;
 
 const MEDALS: [&'static str; 3] = ["🥇", "🥈", "🥉"];
 const TROPHIES: [&'static str; 5] = ["🏆", "🥈", "🥉", "🍫", "🍬"];
@@ -34,7 +34,7 @@ fn symbols_prefix<'a>(symbols: &'a [&'static str]) -> impl Iterator<Item = Strin
 pub enum Event {
     GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
     GlobalLeaderboardHeroFound((String, ProblemPart, u8)),
-    DailyChallengeIsUp(String),
+    DailyChallengeIsUp(u8, String),
     DailySummary(
         i32,
         u8,
@@ -45,7 +45,7 @@ pub enum Event {
     PrivateLeaderboardNewEntries(Vec<DayHighlight>),
     PrivateLeaderboardUpdated,
     PrivateLeaderboardNewMembers(Vec<String>),
-    DailySolutionsThreadToInitialize(u32),
+    DailySolutionsThreadToInitialize(u8),
     CommandReceived(SlackChannelId, SlackTs, Command),
 }
 
@@ -62,13 +62,18 @@ impl fmt::Display for Event {
                         .unwrap()
                 )
             }
-            Event::DailyChallengeIsUp(title) => {
+            Event::DailyChallengeIsUp(day, title) => {
+                let day = format!("Day {day}");
+                let header = match convert(day) {
+                    Ok(string) => string,
+                    Err(_) => "".to_string(),
+                };
                 write!(
                     f,
                     "{}",
                     MessageTemplate::DailyChallenge
                         .get()
-                        .render(context! { title => title })
+                        .render(context! { header => header, title => title })
                         .unwrap()
                 )
             }

@@ -128,32 +128,30 @@ impl Command {
                     Some(Command::NotValid(msg))
                 } else {
                     let formatted = match (&jersey, day) {
-                        // standing yearly, based on points
+                        // standing yearly, based on time
                         (Jersey::YELLOW, None) => {
                             let standings = Standing::new(&leaderboard.leaderboard);
                             let data = standings.tdf_season(&jersey, year);
-                            display::tdf(data)
+                            display::tdf_time_yearly(&data)
                         }
                         // standing yearly, based on points
                         (_, None) => {
                             // TODO: whole season
                             let standings = Standing::new(&leaderboard.leaderboard);
                             let data = standings.tdf_season(&jersey, year);
-                            display::tdf_season(data)
+                            display::tdf_points_yearly(&data)
                         }
-                        // daily, based on time
+                        // santings daily, based on time
                         (Jersey::YELLOW, Some(day)) => {
-                            // TODO: make sure this is correct
                             let standings = Standing::new(&leaderboard.leaderboard);
                             let data = standings.by_time(&Ranking::PART2, year, day);
-                            //TODO: update this display
-                            display::tdf_time(&data)
+                            display::tdf_time_daily(&data)
                         }
-                        // daily, base on points
+                        // standings daily, base on points
                         (_, Some(day)) => {
                             let standings = Standing::new(&leaderboard.leaderboard);
                             let data = standings.by_points(&jersey, year, day);
-                            display::tdf_points(&data)
+                            display::tdf_points_daily(&data)
                         }
                     };
 
