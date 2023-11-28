@@ -128,11 +128,18 @@ impl Command {
                     Some(Command::NotValid(msg))
                 } else {
                     let formatted = match (&jersey, day) {
-                        // standing yearly
-                        (_, None) => {
+                        // standing yearly, based on points
+                        (Jersey::YELLOW, None) => {
                             let standings = Standing::new(&leaderboard.leaderboard);
                             let data = standings.tdf_season(&jersey, year);
                             display::tdf(data)
+                        }
+                        // standing yearly, based on points
+                        (_, None) => {
+                            // TODO: whole season
+                            let standings = Standing::new(&leaderboard.leaderboard);
+                            let data = standings.tdf_season(&jersey, year);
+                            display::tdf_season(data)
                         }
                         // daily, based on time
                         (Jersey::YELLOW, Some(day)) => {
