@@ -136,7 +136,6 @@ impl Command {
                         }
                         // standing yearly, based on points
                         (_, None) => {
-                            // TODO: whole season
                             let standings = Standing::new(&leaderboard.leaderboard);
                             let data = standings.tdf_season(&jersey, year);
                             display::tdf_points_yearly(&data)

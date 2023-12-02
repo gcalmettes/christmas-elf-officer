@@ -42,11 +42,8 @@ pub fn current_year_day() -> (i32, u8) {
         true => year,
         false => year - 1,
     };
-    // let day = now.day() as u8;
-    // (year, day)
-
-    // TODO: remove fixed (year, day) used for dev purpose
-    (2022, 25)
+    let day = now.day() as u8;
+    (year, day)
 }
 
 pub fn format_duration(duration: Duration) -> String {

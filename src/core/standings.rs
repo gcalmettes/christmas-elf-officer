@@ -1,8 +1,8 @@
 use crate::{
-    core::leaderboard::{Entry, Identifier, Leaderboard, ProblemPart},
+    core::leaderboard::{Entry, Identifier, Leaderboard},
     utils::{current_year_day, exponential_decay, format_duration},
 };
-use chrono::{DateTime, Duration, Utc};
+use chrono::Duration;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use std::{cmp::Reverse, collections::HashMap, fmt};

@@ -8,9 +8,6 @@ use core::events::Event;
 use scheduler::{JobProcess, Scheduler};
 use storage::MemoryCache;
 
-use std::time::Duration;
-use tokio::time;
-
 pub mod cli;
 pub mod client;
 pub mod config;
@@ -43,8 +40,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let now_second = now.second();
 
     // At every 15th minute from (now_minute % 15) through 59.
-    let _private_leaderboard_schedule =
-        format!("{} {}/15 * 1-25 12 *", now_second, now_minute % 15);
+    // let private_leaderboard_schedule = format!("{} {}/15 * 1-25 12 *", now_second, now_minute % 15);
+    let private_leaderboard_schedule = format!("{} {}/15 * * 12,1 *", now_second, now_minute % 15);
 
     // Initialize global cache
     let cache = MemoryCache::new();
@@ -53,12 +50,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let jobs = vec![
         JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
-        // JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
-        JobProcess::UpdatePrivateLeaderboard("1/10 * * * * *"),
-        // JobProcess::InitializeDailySolutionsThread("1/15 * * * * *"),
-        // JobProcess::WatchGlobalLeaderboard("1/30 * * * * *"),
-        // JobProcess::ParseDailyChallenge("1/20 * * * * *"),
-        // JobProcess::SendDailySummary("1/20 * * * * *"),
+        JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
+        JobProcess::InitializeDailySolutionsThread("0 30 6 1-25 12 *"),
+        JobProcess::WatchGlobalLeaderboard("0 0 5 1-25 12 *"),
+        JobProcess::ParseDailyChallenge("1 0 5 1-25 12 *"),
+        JobProcess::SendDailySummary("0 30 16 1-25 12 *"),
     ];
     for job in jobs {
         sched.add_job(job).await?;
@@ -69,11 +65,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Initializing messaging engine.");
 
-    // TODO: remove when tests are over
-    // let mut interval = time::interval(Duration::from_secs(10));
-    // loop {
-    //     interval.tick().await;
-    // }
     let slack_client = AoCSlackClient::new();
     slack_client
         .handle_messages_and_events(cache, tx, rx)

@@ -3,13 +3,12 @@ use crate::{
     config,
     core::{
         events::Event,
-        standings::{Jersey, Ranking, Standing},
+        standings::{Ranking, Standing},
     },
     error::{BotError, BotResult},
     storage::MemoryCache,
     utils::{compute_highlights, current_year_day, get_new_members},
 };
-use chrono::{Datelike, Utc};
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Sender, time};
 use tokio_cron_scheduler::{Job, JobScheduler};
@@ -153,19 +152,6 @@ async fn update_private_leaderboard_job(
                     let (highlights, new_members) = {
                         let mut current_leaderboard = cache.data.lock().unwrap();
 
-                        // TODO: remove
-                        // let s = Standing::new(&current_leaderboard.leaderboard);
-                        // let d = s.tdf_season2(&Jersey::COMBATIVE, 2022);
-                        // let (w1, w2, w3) = (20, 8, 8);
-                        // for (id, a, b) in d {
-                        //     println!("{:>w1$} {:<w2$} {:<w3$}", id.name, a, b);
-                        // }
-                        // println!("");
-                        // let s2 = s.by_points(&Jersey::COMBATIVE, 2022, 1);
-                        // for (id, a) in s2 {
-                        //     println!("{:>w1$} {:<w2$}", id.name, a);
-                        // }
-
                         // Check for new parts completions
                         let highlights = compute_highlights(
                             &current_leaderboard.leaderboard,
@@ -250,14 +236,12 @@ async fn watch_global_leaderboard_job(
 
             let (year, day) = current_year_day();
 
-            // let mut known_hero_hits: Vec<(&String, ProblemPart, u8)> = vec![];
             let mut known_hero_hashes: Vec<String> = vec![];
 
             info!("Starting polling Global Leaderboard for day {day}.");
             let mut is_global_leaderboard_complete = false;
 
             while !is_global_leaderboard_complete {
-                info!("Global Leaderboard for day {day} not complete yet.");
                 match aoc_client.global_leaderboard(year, day).await {
                     Ok(global_leaderboard) => {
                         is_global_leaderboard_complete =
@@ -321,6 +305,8 @@ async fn watch_global_leaderboard_job(
                                     error!("{error}");
                                 }
                             }
+                        } else {
+                            info!("Global Leaderboard for day {day} not complete yet.");
                         }
                     }
                     Err(e) => {
