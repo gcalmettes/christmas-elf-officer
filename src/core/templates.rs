@@ -31,6 +31,7 @@ pub enum MessageTemplate {
     DailySolutionThread,
     DailySummary,
     GlobalStatistics,
+    HardChallenge,
     PrivateLeaderboardUpdated,
     LeaderboardMemberJoin,
     NewEntriesToday,
@@ -54,6 +55,7 @@ impl MessageTemplate {
             MessageTemplate::NewEntriesToday => "today_entries.txt",
             MessageTemplate::NewEntriesLate => "late_entries.txt",
             MessageTemplate::GlobalStatistics => "global_leaderboard_statistics.txt",
+            MessageTemplate::HardChallenge => "hard_challenge.txt",
             MessageTemplate::Ranking => "ranking.txt",
             MessageTemplate::TdfStandings => "tdf.txt",
             MessageTemplate::LeaderboardDisplay => "leaderboard.txt",
@@ -102,6 +104,18 @@ impl MessageTemplate {
             },
             MessageTemplate::CustomMessage => {
                 "🙅 {{message}}"
+            },
+            MessageTemplate::HardChallenge => {
+                "😱 *{{minutes}} minutes* went by already and there are still some spots to grab in the global leaderboard ...\n\
+                {% if cycle == 5 -%}
+                    Not sure about you, but it feels like the temperature 🤒 is suddenly rising...
+                {% elif cycle == 8 -%}
+                    I guess now is a good time to have some handkerchief ready nearby in case you need to cry 😭.
+                {% elif cycle == 11 -%}
+                    Don't worry, feeling the urge to phone ☎️  a friend in order to cry for help 🆘 is a normal desire today.
+                {% else -%}
+                    Oh boy, time to raise the flag for hope 🏴 ... I can only wish you good luck 🤞, you will definitely need it today ...
+                {% endif %}"
             },
             MessageTemplate::DailyChallenge => {
                 "```{{header}}```\n\

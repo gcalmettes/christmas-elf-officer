@@ -34,6 +34,7 @@ fn symbols_prefix<'a>(symbols: &'a [&'static str]) -> impl Iterator<Item = Strin
 pub enum Event {
     GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
     GlobalLeaderboardHeroFound((String, ProblemPart, u8)),
+    GlobalLeaderboardUpdateMessage(u64, u64),
     DailyChallengeIsUp(u8, String),
     DailySummary(
         i32,
@@ -109,6 +110,20 @@ impl fmt::Display for Event {
                             ranking_p1 => prefixed_p1,
                             ranking_p2 => prefixed_p2,
                             ranking_delta => prefixed_delta,
+                        })
+                        .unwrap()
+                )
+            }
+            Event::GlobalLeaderboardUpdateMessage(cycle, time_seconds) => {
+                let minutes = (time_seconds / 60) % 60;
+                write!(
+                    f,
+                    "{}",
+                    MessageTemplate::HardChallenge
+                        .get()
+                        .render(context! {
+                            minutes => minutes,
+                            cycle => cycle
                         })
                         .unwrap()
                 )

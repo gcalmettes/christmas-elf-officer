@@ -234,12 +234,17 @@ async fn watch_global_leaderboard_job(
                 settings.global_leaderboard_polling_interval_sec,
             ));
 
+            // Note: the first interval tick ticks immediately, so we trigger it
+            // to ensure the counter reflects interval time multiples.
+            interval.tick().await;
+
             let (year, day) = current_year_day();
 
             let mut known_hero_hashes: Vec<String> = vec![];
 
             info!("Starting polling Global Leaderboard for day {day}.");
             let mut is_global_leaderboard_complete = false;
+            let mut counter = 0;
 
             while !is_global_leaderboard_complete {
                 match aoc_client.global_leaderboard(year, day).await {
@@ -307,6 +312,18 @@ async fn watch_global_leaderboard_job(
                             }
                         } else {
                             info!("Global Leaderboard for day {day} not complete yet.");
+                            if [5, 8, 11, 14].contains(&counter) {
+                                let num_sec = interval.period().as_secs() * counter;
+                                if let Err(e) = sender
+                                    .send(Event::GlobalLeaderboardUpdateMessage(counter, num_sec))
+                                    .await
+                                {
+                                    let error = BotError::ChannelSend(format!(
+                                        "Could not send message to MPSC channel. {e}"
+                                    ));
+                                    error!("{error}");
+                                };
+                            }
                         }
                     }
                     Err(e) => {
@@ -316,6 +333,7 @@ async fn watch_global_leaderboard_job(
                     }
                 };
 
+                counter += 1;
                 interval.tick().await;
             }
         })
@@ -333,7 +351,6 @@ async fn parse_daily_challenge_job(schedule: &str, sender: Arc<Sender<Event>>) -
 
             info!("Retrieving challenge title for day {day}.");
 
-            info!("Global Leaderboard for day {day} not complete yet.");
             match aoc_client.daily_challenge(year, day).await {
                 Ok(title) => {
                     if let Err(e) = sender
