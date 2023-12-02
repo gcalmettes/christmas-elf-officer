@@ -166,7 +166,7 @@ impl MessageTemplate {
             MessageTemplate::NewEntriesLate => {
                 "{%- for entry in completions %}\n\
                     {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
-                    🚂  {{entry.name}} just catched up on *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }}) +{{entry.new_points}}pts
+                    🚂  {{entry.name}} just caught up on *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }}) +{{entry.new_points}}pts
                     {%- endwith %}
                  {%- endfor %}"
             },
