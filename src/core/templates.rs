@@ -158,15 +158,15 @@ impl MessageTemplate {
             },
             MessageTemplate::NewEntriesToday => {
                 "{%- for entry in completions %}\n\
-                    {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
-                    📣 {{entry.name}} just earned *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} {{ ['(day', entry.day, double, 'completed!)']|join(' ')  if both else ['for day', entry.day, single]|join(' ') }} +{{entry.new_points}}pts
+                    {% with both = entry.parts_duration|length > 1, double = '⭐⭐', single = '⭐' %}\
+                    📣 {{entry.name}} just earned *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} for day {{entry.day}} ({{[double, '*<->', entry.delta, '*']|join(' ') if both else single}}) +{{entry.new_points}}pts
                     {%- endwith %}
                  {%- endfor %}\n"
             },
             MessageTemplate::NewEntriesLate => {
                 "{%- for entry in completions %}\n\
-                    {% with both = entry.parts_duration|length > 1, double = ':white_check_mark:', single = ':heavy_check_mark:' %}\
-                    🚂  {{entry.name}} just caught up on *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} ({{ ['day', entry.day, double, 'completed!']|join(' ')  if both else single }}) +{{entry.new_points}}pts
+                    {% with both = entry.parts_duration|length > 1, double = '✅', single = '✔️' %}\
+                    🚂  {{entry.name}} just caught up on *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} for day {{entry.day}} ({{ [double, 'day completed!', '*<->', entry.delta, '*']|join(' ')  if both else single }}) +{{entry.new_points}}pts
                     {%- endwith %}
                  {%- endfor %}"
             },
