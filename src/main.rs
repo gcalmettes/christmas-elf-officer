@@ -40,7 +40,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let now_second = now.second();
 
     // At every 15th minute from (now_minute % 15) through 59.
-    // let private_leaderboard_schedule = format!("{} {}/15 * 1-25 12 *", now_second, now_minute % 15);
     let private_leaderboard_schedule = format!("{} {}/15 * * 12,1 *", now_second, now_minute % 15);
 
     // Initialize global cache
@@ -51,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let jobs = vec![
         JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
         JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
-        JobProcess::InitializeDailySolutionsThread("0 30 6 1-25 12 *"),
+        JobProcess::InitializeDailySolutionsThread("0 30 8 1-25 12 *"),
         JobProcess::WatchGlobalLeaderboard("0 0 5 1-25 12 *"),
         JobProcess::ParseDailyChallenge("1 0 5 1-25 12 *"),
         JobProcess::SendDailySummary("0 30 16 1-25 12 *"),
