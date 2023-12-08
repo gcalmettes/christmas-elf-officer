@@ -159,8 +159,23 @@ async fn push_events_socket_mode_function(
     states: SlackClientEventsUserState,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if let SlackEventCallbackBody::Message(message) = event.event {
-        // Only respond to messages from users (no bot_id)
-        if let None = message.sender.bot_id {
+        // Only respond to messages from users (no bot_id) or allowed bots
+        if message
+            .sender
+            .bot_id
+            .and_then(|id| {
+                let settings = &config::SETTINGS;
+                match settings
+                    .slack_bots_authorized_ids
+                    .as_ref()
+                    .is_some_and(|whitelisted| whitelisted.contains(&id.to_string()))
+                {
+                    true => None,
+                    false => Some("Bot id not whitelisted"),
+                }
+            })
+            .is_none()
+        {
             // message from user, we will handle it if there is content and channel_id
             if let (Some(content), Some(channel_id)) = (message.content, message.origin.channel) {
                 if let Some(t) = content.text {

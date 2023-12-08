@@ -26,6 +26,9 @@ pub struct Settings {
     pub slack_default_channel: String,
     // Channel to reveive heartbeats and monitoring events
     pub slack_monitoring_channel: Option<String>,
+    // Will not treat any message from bots users, unless specifically authorized.
+    // If using matterbridge you might want to leverage this option.
+    pub slack_bots_authorized_ids: Option<Vec<String>>,
     #[serde(default = "default_global_leaderboard_polling_interval_sec")]
     pub global_leaderboard_polling_interval_sec: u64,
     #[serde(default = "default_aoc_base_url")]
