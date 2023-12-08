@@ -44,10 +44,13 @@ pub enum Event {
         Vec<(String, String)>,
     ),
     PrivateLeaderboardNewEntries(Vec<DayHighlight>),
-    PrivateLeaderboardUpdated,
     PrivateLeaderboardNewMembers(Vec<String>),
     DailySolutionsThreadToInitialize(u8),
     CommandReceived(SlackChannelId, SlackTs, Command),
+    // Debug/Monitoring events
+    PrivateLeaderboardUpdated,
+    // GlobalLeaderboardPollingStarted,
+    // FailedFetching,
 }
 
 impl fmt::Display for Event {

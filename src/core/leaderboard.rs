@@ -581,6 +581,10 @@ impl ScrapedLeaderboard {
 
     pub fn merge_with(&mut self, other: ScrapedLeaderboard) {
         self.timestamp = other.timestamp;
+        // TODO: if a member changes his/her name, this will be flagged as a new member ...
+        // We need to handle this by checking on unique id. Maybe replace the full year with updated
+        // leaderboard if we find duplicates for same id ?
+
         // Cloning the leaderboard is expensive, but this operation is only done every 15min
         self.leaderboard
             .extend(other.leaderboard.clone().into_iter());
