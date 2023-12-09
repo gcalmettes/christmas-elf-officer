@@ -177,11 +177,11 @@ impl MessageTemplate {
                     \x20 • Delta times range: 🏃‍♀️ {{delta_fast}} - {{delta_slow}} 🚶‍♀️"
             }
             MessageTemplate::Ranking => {
-                "{% if current_day %}
+                "{%- if current_day -%}
                     Today's {{'fastest' if not is_limit else 'closest'}} *{{ ranking_method }} time* (as of {{timestamp}}):\n\
-                {% else %}
+                {%- else -%}
                     {{'Fastest' if not is_limit else 'Closest'}} *{{ ranking_method }} time* for day {{ day }}/12/{{ year }}:\n\
-                {% endif %}
+                {%- endif -%}
                 {%- for (prefix, name, time) in ranking %}\n\
                     {{prefix}} in ⏱️ {{time}} 👉🏻 *{{name}}*
                 {%- endfor %}"
