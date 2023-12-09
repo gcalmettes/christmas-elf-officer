@@ -178,10 +178,10 @@ impl MessageTemplate {
             }
             MessageTemplate::Ranking => {
                 "{%- if current_day -%}
-                    Today's {{'fastest' if not is_limit else 'closest'}} *{{ ranking_method }} time* (as of {{timestamp}}):\n\
+                    Today's {{'fastest' if not is_limit else 'closest'}} *{{ ranking_method }} time* (as of {{timestamp}}):
                 {%- else -%}
-                    {{'Fastest' if not is_limit else 'Closest'}} *{{ ranking_method }} time* for day {{ day }}/12/{{ year }}:\n\
-                {%- endif -%}
+                    {{'Fastest' if not is_limit else 'Closest'}} *{{ ranking_method }} time* for day {{ day }}/12/{{ year }}:
+                {%- endif %}\n\
                 {%- for (prefix, name, time) in ranking %}\n\
                     {{prefix}} in ⏱️ {{time}} 👉🏻 *{{name}}*
                 {%- endfor %}"
@@ -191,20 +191,20 @@ impl MessageTemplate {
             },
             MessageTemplate::LeaderboardDisplay => {
                 "{%- if current_year -%}
-                    📓 Current Leaderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} as of {{timestamp}}:\n\
+                    📓 Current Leaderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} as of {{timestamp}}:
                 {%- else -%}
-                    📓 Learderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} from the {{ year }} event:\n\
-                {%- endif -%}
+                    📓 Learderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} from the {{ year }} event:
+                {%- endif %}\n\
                 ```{{ leaderboard }}```"
             }
             MessageTemplate::TdfStandings => {
                 "{%- if current_year and not day -%}
-                    🚴 {{ '🟡 Yellow 🛵' if jersey=='yellow' else ('🟢 Green 🍏' if jersey=='green' else '⚫Combative 🥋')}} Jersey current standings as of {{timestamp}}:\n\
+                    🚴 {{ '🟡 Yellow 🛵' if jersey=='yellow' else ('🟢 Green 🍏' if jersey=='green' else '⚫Combative 🥋')}} Jersey current standings as of {{timestamp}}:
                 {%- elif not day -%}
-                    🚴 {{ '🟡 Yellow 🛵' if jersey=='yellow' else ('🟢 Green 🍏' if jersey=='green' else '⚫Combative 🥋')}} Jersey standings from the *{{year}}* event:\n\
+                    🚴 {{ '🟡 Yellow 🛵' if jersey=='yellow' else ('🟢 Green 🍏' if jersey=='green' else '⚫Combative 🥋')}} Jersey standings from the *{{year}}* event:
                 {%- else -%}
-                    🚴 {{ '🟡 Yellow 🛵' if jersey=='yellow' else ('🟢 Green 🍏' if jersey=='green' else '⚫Combative 🥋')}} Jersey standings for *day {{day}}* of the {{year}} event:\n\
-                {%- endif -%}
+                    🚴 {{ '🟡 Yellow 🛵' if jersey=='yellow' else ('🟢 Green 🍏' if jersey=='green' else '⚫Combative 🥋')}} Jersey standings for *day {{day}}* of the {{year}} event:
+                {%- endif %}\n\
                 ```{{ standings }}```"
             }
         }
