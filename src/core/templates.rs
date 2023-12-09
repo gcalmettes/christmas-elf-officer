@@ -191,9 +191,9 @@ impl MessageTemplate {
             },
             MessageTemplate::LeaderboardDisplay => {
                 "{%- if current_year -%}
-                    📓 Current Leaderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} as of {{timestamp}}:
+                    📓 Current Leaderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} as of {{timestamp}}:\n\
                 {%- else -%}
-                    📓 Learderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} from the {{ year }} event:
+                    📓 Learderboard by {{ '*local score*' if scoring_method == 'local' else '*number of stars*' }} from the {{ year }} event:\n\
                 {%- endif -%}
                 ```{{ leaderboard }}```"
             }
