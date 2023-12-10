@@ -165,7 +165,7 @@ impl MessageTemplate {
             },
             MessageTemplate::NewEntriesLate => {
                 "{%- for entry in completions %}\n\
-                    {% with both = entry.parts_duration|length > 1, double = '✅', single = '✔️' %}\
+                    {% with both = entry.parts_duration|length > 1, double = '🤩', single = '✔️' %}\
                     🚂  {{entry.name}} just caught up on *{{entry.n_stars}}* more star{{ 's' if entry.n_stars > 1 }} for day {{entry.day}} ({{ [double, 'both parts completed!', '*<->', entry.delta, '*']|join(' ')  if both else single }}) +{{entry.new_points}}pts
                     {%- endwith %}
                  {%- endfor %}"
