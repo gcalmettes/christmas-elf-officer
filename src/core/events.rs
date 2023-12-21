@@ -118,7 +118,7 @@ impl fmt::Display for Event {
                 )
             }
             Event::GlobalLeaderboardUpdateMessage(cycle, time_seconds) => {
-                let minutes = (time_seconds / 60) % 60;
+                let minutes = time_seconds / 60;
                 write!(
                     f,
                     "{}",
