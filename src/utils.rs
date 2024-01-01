@@ -38,7 +38,7 @@ pub fn current_year_day() -> (i32, u8) {
         // if something wrong happen in the parsing, we won't take the current year into account
         .map_or_else(|| now + Duration::minutes(10), |t| t - Duration::days(10));
 
-    let _year = match start_aoc_period <= now {
+    let year = match start_aoc_period <= now {
         true => year,
         false => year - 1,
     };
