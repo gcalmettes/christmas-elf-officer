@@ -1,8 +1,8 @@
 use crate::{
     core::leaderboard::{Entry, Identifier, Leaderboard},
-    utils::{current_year_day, exponential_decay, format_duration},
+    utils::{exponential_decay, format_duration},
 };
-use chrono::Duration;
+use chrono::{Datelike, Duration, Utc};
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use std::{cmp::Reverse, collections::HashMap, fmt};
@@ -186,7 +186,12 @@ impl Standing<'_> {
             // returns Vec<(id, total time in secs, number of days over stage cutoff)>
             Jersey::YELLOW => {
                 // how many possible days to score for yellow jersey
-                let (current_year, current_day) = current_year_day();
+                // NOTE: we cannot use utils::current_year_day() as we want to make sure that if we
+                // are in the first 11 months of the year, the actual current year is returned.
+                let now = Utc::now();
+                let current_year = now.year();
+                let current_day = now.day() as u8;
+
                 let max_n_days = match year == current_year {
                     false => 25,
                     true => current_day as i64,
