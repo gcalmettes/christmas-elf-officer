@@ -185,16 +185,18 @@ impl Standing<'_> {
         match jersey {
             // returns Vec<(id, total time in secs, number of days over stage cutoff)>
             Jersey::YELLOW => {
-                // how many possible days to score for yellow jersey
-                // NOTE: we cannot use utils::current_year_day() as we want to make sure that if we
-                // are in the first 11 months of the year, the actual current year is returned.
+                // NOTE: here we cannot use utils::current_year_day() to get the current year.
+                // Using current_year_day() would return the last aoc year, not necessarily the
+                // actual current year (if we are in the first 11 months of the year). So we
+                // would incorrectly compute the max_n_days below, since it would compare it to
+                // "year", which is already computed using the current_year_day function, and as
+                // such would incorrectly use the current day.
                 let now = Utc::now();
-                let current_year = now.year();
-                let current_day = now.day() as u8;
 
-                let max_n_days = match year == current_year {
+                // how many possible days to score for yellow jersey
+                let max_n_days = match year == now.year() {
                     false => 25,
-                    true => current_day as i64,
+                    true => now.day() as i64,
                 };
 
                 let data = self.leaderboard.entries_per_day_member_for_year(year);
