@@ -187,16 +187,24 @@ impl Standing<'_> {
             Jersey::YELLOW => {
                 // NOTE: here we cannot use utils::current_year_day() to get the current year.
                 // Using current_year_day() would return the last aoc year, not necessarily the
-                // actual current year (if we are in the first 11 months of the year). So we
-                // would incorrectly compute the max_n_days below, since it would compare it to
-                // "year", which is already computed using the current_year_day function, and as
-                // such would incorrectly use the current day.
+                // actual current year (if we are in the first 11 months of the year following the
+                // last AOC). So we would incorrectly compute the max_n_days below, since it would
+                // comparecompare it to "year", which is already computed using the current_year_day
+                // function, and as such would incorrectly use the current day.
                 let now = Utc::now();
 
                 // how many possible days to score for yellow jersey
+                let current_day = now.day();
                 let max_n_days = match year == now.year() {
                     false => 25,
-                    true => now.day() as i64,
+                    true => {
+                        // Ensure correct output from 26/12 to 31/12 of ongoing AOC event
+                        if current_day <= 25 {
+                            current_day as i64
+                        } else {
+                            25
+                        }
+                    }
                 };
 
                 let data = self.leaderboard.entries_per_day_member_for_year(year);
@@ -327,82 +335,6 @@ impl Standing<'_> {
         }
     }
 
-    // /// ordered vec of (id, total duration, days over the cut off)
-    // pub fn tdf_season_0<'a: 'b, 'b>(
-    //     &'a self,
-    //     jersey: &'b Jersey,
-    //     year: i32,
-    // ) -> Vec<(&'a Identifier, i64, i64)> {
-    //     // We do the computation only when necessary
-    //     // let challenges_min_max_time = match jersey {
-    //     //     // We will use max time of part 1 to infer deltas for members who only scored
-    //     //     // the second part on that day.
-    //     //     // Min-Max time for each (day, part)
-    //     //     Jersey::GREEN => Some(self.leaderboard.parts_min_max_times_for_year(year)),
-    //     //     _ => None,
-    //     // };
-
-    //     let (duration_sum_per_member, max_n_days) = self
-    //         .leaderboard
-    //         .iter()
-    //         .filter(|s| s.year == year)
-    //         .into_group_map_by(|s| (&s.id, s.day))
-    //         .into_iter()
-    //         .filter_map(|((id, _day), entries_for_day)| match jersey {
-    //             Jersey::YELLOW => Standing::get_time_for_part(&entries_for_day, Ranking::PART2)
-    //                 .and_then(|duration| Some((id, duration))),
-    //             // TODO: switch to points system
-    //             Jersey::GREEN => todo!(),
-    //             // Standing::compute_green_jersey_duration(
-    //             // &entries_for_day,
-    //             // challenges_min_max_time.as_ref().unwrap(),
-    //             // )
-    //             // .and_then(|duration| Some((id, duration))),
-    //             // TODO: implement
-    //             Jersey::COMBATIVE => todo!(),
-    //         })
-    //         .fold((HashMap::new(), 0), |mut acc, (id, duration)| {
-    //             let duration_sum_and_count = acc.0.entry(id).or_insert((0, 0));
-    //             // we do not want to be unfair with members having finished a day in a time that exceed
-    //             // the time penalty for finishing a day inflicted to members not having finished a day.
-    //             let duration_to_add = match (*PENALTY_UNFINISHED_DAY - duration.num_seconds()) > 0 {
-    //                 // time to complete is not greater than max time penalty
-    //                 true => duration.num_seconds(),
-    //                 false => *PENALTY_UNFINISHED_DAY,
-    //             };
-    //             *duration_sum_and_count = (
-    //                 duration_sum_and_count.0 + duration_to_add,
-    //                 duration_sum_and_count.1 + 1,
-    //             );
-    //             // we keep track of the max number of full days resolved, so we can later add penalty
-    //             // for unfinished days
-    //             acc.1 = std::cmp::max(acc.1, duration_sum_and_count.1);
-    //             acc
-    //         });
-
-    //     let standings = duration_sum_per_member
-    //         .iter()
-    //         .map(|(id, (total_duration, finished_days))| {
-    //             let days_over_cutoff = max_n_days - finished_days;
-    //             match days_over_cutoff {
-    //                 0 => (*id, *total_duration, days_over_cutoff),
-    //                 diff => {
-    //                     // penalty for every challenge not completed
-    //                     let total_duration = total_duration + diff * (*PENALTY_UNFINISHED_DAY);
-    //                     (*id, total_duration, days_over_cutoff)
-    //                 }
-    //             }
-    //         })
-    //         // sort by total time ascending, then by number of penalties ascendings
-    //         .sorted_unstable_by(|a, b| match a.1 == b.1 {
-    //             true => a.2.cmp(&b.2),
-    //             false => a.1.cmp(&b.1),
-    //         })
-    //         .collect::<Vec<(&Identifier, i64, i64)>>();
-
-    //     standings
-    // }
-
     fn ranked_times_for_year_day<'a, 'b>(
         &'a self,
         ranking_type: &'b Ranking,
@@ -497,33 +429,6 @@ impl Standing<'_> {
             remaining_time,
         )
     }
-
-    // fn compute_green_jersey_duration(
-    //     daily_entries: &Vec<&Entry>,
-    //     challenges_min_max_time: &HashMap<(u8, ProblemPart), (DateTime<Utc>, DateTime<Utc>)>,
-    // ) -> Option<Duration> {
-    //     match daily_entries.len() {
-    //         1 => {
-    //             // unwrap is safe as len == 1
-    //             let entry = daily_entries.last().unwrap();
-    //             match entry.part {
-    //                 ProblemPart::FIRST => None,
-    //                 ProblemPart::SECOND => {
-    //                     // Overtimed on first part, but came back strong to score second part
-    //                     // Duration is > (part.1, - max first part). We'll substract 1 sec.
-    //                     let max_time_first_part = challenges_min_max_time
-    //                         .get(&(entry.day, ProblemPart::FIRST))
-    //                         .and_then(|(_p1_fast, p1_slow)| Some(*p1_slow))
-    //                         .unwrap();
-
-    //                     Some(entry.timestamp - max_time_first_part - Duration::seconds(1))
-    //                 }
-    //             }
-    //         }
-    //         2 => Standing::compute_delta(daily_entries),
-    //         _ => unreachable!(),
-    //     }
-    // }
 }
 
 ////////////////////////////////////////////////
