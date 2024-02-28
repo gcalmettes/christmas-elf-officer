@@ -1,6 +1,8 @@
 # christmas-elf-officer
 An Advent of Code cheerful friend
 
+<img style="display: block; margin-left: auto; margin-right: auto; width: 70%;" src="https://raw.githubusercontent.com/gcalmettes/christmas-elf-officer/main/img/hld-ceo.png"></img>
+
 # Configuration
 
 ## Environment variables:
