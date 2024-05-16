@@ -27,9 +27,9 @@ pub struct AoCSlackClient {
 }
 
 impl AoCSlackClient {
-    pub fn new() -> Self {
-        let client = Arc::new(SlackClient::new(SlackClientHyperConnector::new()));
-        Self { client }
+    pub fn new() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let client = Arc::new(SlackClient::new(SlackClientHyperConnector::new()?));
+        Ok(Self { client })
     }
 
     pub async fn handle_messages_and_events(

@@ -64,7 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     info!("Initializing messaging engine.");
 
-    let slack_client = AoCSlackClient::new();
+    let slack_client = AoCSlackClient::new().expect("Slack client could not be initialized");
     slack_client
         .handle_messages_and_events(cache, tx, rx)
         .await?;
