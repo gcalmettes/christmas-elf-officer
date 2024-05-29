@@ -18,6 +18,8 @@ const GREEN_JERSEY_POINTS: [u8; 15] = [50, 30, 20, 18, 16, 14, 12, 10, 8, 7, 6, 
 const COMBATIVE_JERSEY_MAX_POINTS: f32 = 500.0;
 const COMBATIVE_JERSEY_POINTS_DECAY_RATE: f32 = 0.005;
 
+pub type DailyStarsAndScores = [(u8, usize); 25];
+
 #[derive(Debug, Clone)]
 pub enum Scoring {
     LOCAL,
@@ -435,7 +437,7 @@ pub fn standings_board<'a>(
     score_type: &Scoring,
     leaderboard: &'a Leaderboard,
     year: i32,
-) -> Vec<(&'a Identifier, [(u8, usize); 25], usize)> {
+) -> Vec<(&'a Identifier, DailyStarsAndScores, usize)> {
     let scores = leaderboard.daily_stars_and_scores_per_member_for_year(year);
     let entries = scores
         .into_iter()

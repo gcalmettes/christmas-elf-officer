@@ -1,5 +1,8 @@
 use crate::{
-    core::{leaderboard::Identifier, standings::PENALTY_UNFINISHED_DAY},
+    core::{
+        leaderboard::Identifier,
+        standings::{DailyStarsAndScores, PENALTY_UNFINISHED_DAY},
+    },
     utils::{format_duration, format_duration_with_days},
 };
 use chrono::Duration;
@@ -156,7 +159,7 @@ pub fn tdf_time_daily(entries: &[(String, String)]) -> String {
 }
 
 // Display board from given entries
-pub fn board(entries: Vec<(&Identifier, [(u8, usize); 25], usize)>) -> String {
+pub fn board(entries: Vec<(&Identifier, DailyStarsAndScores, usize)>) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();
