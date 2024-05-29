@@ -8,6 +8,12 @@ pub struct MemoryCache {
     pub data: SharedLeaderboard,
 }
 
+impl Default for MemoryCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryCache {
     pub fn new() -> MemoryCache {
         MemoryCache {

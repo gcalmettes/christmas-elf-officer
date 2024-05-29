@@ -14,8 +14,8 @@ use slack_morphism::{SlackChannelId, SlackTs};
 use std::fmt;
 use text_to_ascii_art::convert;
 
-const MEDALS: [&'static str; 3] = ["🥇", "🥈", "🥉"];
-const TROPHIES: [&'static str; 5] = ["🏆", "🥈", "🥉", "🍫", "🍬"];
+const MEDALS: [&str; 3] = ["🥇", "🥈", "🥉"];
+const TROPHIES: [&str; 5] = ["🏆", "🥈", "🥉", "🍫", "🍬"];
 
 fn symbols_prefix<'a>(symbols: &'a [&'static str]) -> impl Iterator<Item = String> + 'a {
     let num = symbols.len();
@@ -85,19 +85,19 @@ impl fmt::Display for Event {
                 // Prefix with medal or ranking
                 let prefixed_p1 = p1_data
                     .iter()
-                    .zip(symbols_prefix(&TROPHIES).into_iter())
+                    .zip(symbols_prefix(&TROPHIES))
                     .map(|((name, score), prefix)| (prefix, name, format!("{:>9}", score)))
                     .take(5)
                     .collect::<Vec<(String, &String, String)>>();
                 let prefixed_p2 = p2_data
                     .iter()
-                    .zip(symbols_prefix(&TROPHIES).into_iter())
+                    .zip(symbols_prefix(&TROPHIES))
                     .map(|((name, score), prefix)| (prefix, name, format!("{:>9}", score)))
                     .take(5)
                     .collect::<Vec<(String, &String, String)>>();
                 let prefixed_delta = delta_data
                     .iter()
-                    .zip(symbols_prefix(&TROPHIES).into_iter())
+                    .zip(symbols_prefix(&TROPHIES))
                     .map(|((name, score), prefix)| (prefix, name, format!("{:>9}", score)))
                     .take(5)
                     .collect::<Vec<(String, &String, String)>>();
@@ -138,10 +138,10 @@ impl fmt::Display for Event {
                         MessageTemplate::GlobalStatistics.get()
                         .render(context! {
                             day => day,
-                            p1_fast => statistics.p1_fast.map_or("N/A".to_string(), |d| format_duration(d)),
-                            p1_slow => statistics.p1_slow.map_or("N/A".to_string(), |d| format_duration(d)),
-                            p2_fast => statistics.p2_fast.map_or("N/A".to_string(), |d| format_duration(d)),
-                            p2_slow => statistics.p2_slow.map_or("N/A".to_string(), |d| format_duration(d)),
+                            p1_fast => statistics.p1_fast.map_or("N/A".to_string(), format_duration),
+                            p1_slow => statistics.p1_slow.map_or("N/A".to_string(), format_duration),
+                            p2_fast => statistics.p2_fast.map_or("N/A".to_string(), format_duration),
+                            p2_slow => statistics.p2_slow.map_or("N/A".to_string(), format_duration),
                             delta_fast => statistics.delta_fast.map_or("N/A".to_string(), |(d, rank)| {
                                 let rank = rank.unwrap_or_default();
                                 format!("*{}* ({})", format_duration(d), format_rank(rank))
@@ -174,7 +174,7 @@ impl fmt::Display for Event {
                     "{}",
                     MessageTemplate::PrivateLeaderboardUpdated
                         .get()
-                        .render({})
+                        .render(())
                         .unwrap()
                 )
             }
@@ -196,7 +196,7 @@ impl fmt::Display for Event {
                 };
                 if let Some(late_entries) = is_today_entries.get(&false) {
                     if !output.is_empty() {
-                        output.push_str("\n");
+                        output.push('\n');
                     };
                     output.push_str(
                         &MessageTemplate::NewEntriesLate
@@ -232,7 +232,7 @@ impl fmt::Display for Event {
                         )
                     }
                     Command::Help => {
-                        write!(f, "{}", MessageTemplate::Help.get().render({}).unwrap())
+                        write!(f, "{}", MessageTemplate::Help.get().render(()).unwrap())
                     }
                     Command::Ranking(year, day, data, time, method) => {
                         let now = time.with_timezone(&Local);
@@ -241,7 +241,7 @@ impl fmt::Display for Event {
                         // Prefix with medal or ranking
                         let prefixed_data = data
                             .iter()
-                            .zip(symbols_prefix(&MEDALS).into_iter())
+                            .zip(symbols_prefix(&MEDALS))
                             .map(|((name, score), prefix)| (prefix, name, format!("{:>9}", score)))
                             .collect::<Vec<(String, &String, String)>>();
 
@@ -257,7 +257,7 @@ impl fmt::Display for Event {
                                     timestamp => timestamp,
                                     ranking => prefixed_data,
                                     ranking_method => method.to_string(),
-                                    is_limit => match method {Ranking::LIMIT => true, _ => false},
+                                    is_limit => matches!(method, Ranking::LIMIT),
                                 })
                                 .unwrap()
                         )

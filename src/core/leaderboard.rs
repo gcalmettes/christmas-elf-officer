@@ -112,7 +112,7 @@ impl Entry {
                         let text = node.last_child().unwrap().value();
                         let text = text.as_text().unwrap().trim();
                         // We ignore <a> tags related to (AoC++) or (Sponsor) labels.
-                        match (text.starts_with("("), text.ends_with(")")) {
+                        match (text.starts_with('('), text.ends_with(')')) {
                             (false, false) => Some(text),
                             (_, _) => None,
                         }
@@ -127,7 +127,7 @@ impl Entry {
         let rank = match entry.select(&rank_selector).next() {
             Some(text) => match text.text().next() {
                 Some(t) => t
-                    .split(")")
+                    .split(')')
                     .next()
                     .and_then(|rank| rank.trim().parse::<u8>().ok()),
                 None => None,
@@ -140,9 +140,7 @@ impl Entry {
                 .text()
                 .filter_map(|time| {
                     let with_year = format!("{} {}", year, time);
-                    let naive_datetime =
-                        NaiveDateTime::parse_from_str(&with_year, "%Y %b %d  %H:%M:%S").ok();
-                    naive_datetime
+                    NaiveDateTime::parse_from_str(&with_year, "%Y %b %d  %H:%M:%S").ok()
                 })
                 .map(|d| {
                     // Global leaderboard entries are starting at 00:00:00, so we need to offset by
@@ -206,6 +204,12 @@ impl Entry {
         // NOTE: this is only correct for 30 first days of december
         let next_release_time = Entry::puzzle_unlock(self.year, self.day + 1)?;
         Ok(next_release_time - self.timestamp)
+    }
+}
+
+impl Default for Leaderboard {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

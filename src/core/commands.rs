@@ -12,7 +12,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use std::{collections::HashMap, iter::Iterator};
 
-const COMMANDS: [&'static str; 4] = ["!help", "!fast", "!board", "!tdf"];
+const COMMANDS: [&str; 4] = ["!help", "!fast", "!board", "!tdf"];
 static REGEX_COMMANDS: Lazy<Regex> =
     Lazy::new(|| {
         let commands = COMMANDS.join(r"|^");
@@ -49,7 +49,7 @@ impl Command {
             .collect()
     }
     pub fn is_command(input: &str) -> bool {
-        Self::parse_string(input).get("cmd").is_some()
+        Self::parse_string(input).contains_key("cmd")
     }
 
     // Note that we call this command on matching command strings, so we know

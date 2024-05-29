@@ -46,6 +46,25 @@ pub fn current_year_day() -> (i32, u8) {
     (year, day)
 }
 
+// /// Get the last valid AOC (year, day) combo.
+// /// If AOC is ongoing, returns the current year and current day.
+// /// If AOC is over, returns the previous year (no specific day).
+// pub fn current_aoc_year_day() -> (i32, Option<u8>) {
+//     let now = Utc::now();
+//     let year = now.year();
+
+//     // We start taking the current year into account 10 days before the first puzzle unlocks.
+//     let start_aoc_period = Entry::puzzle_unlock(year, 1)
+//         .ok()
+//         // if something wrong happen in the parsing, we won't take the current year into account
+//         .map_or_else(|| now + Duration::minutes(10), |t| t - Duration::days(10));
+
+//     match start_aoc_period <= now {
+//         true => (year, Some(now.day() as u8)),
+//         false => (year - 1, None),
+//     }
+// }
+
 pub fn format_duration(duration: Duration) -> String {
     let seconds = duration.num_seconds() % 60;
     let minutes = (duration.num_seconds() / 60) % 60;
@@ -121,19 +140,19 @@ pub fn compute_highlights(current: &Leaderboard, new: &Leaderboard) -> Vec<DayHi
                     // Difference in score
                     let day_index = *d as usize - 1; // arrays are zero-indexed
                     let score_increase = new_scores
-                        .get(&(*year, &id))
-                        .and_then(|days| Some(days[day_index]))
+                        .get(&(*year, id))
+                        .map(|days| days[day_index])
                         // we know there is a score, unwrap safely
                         .unwrap()
                         - current_scores
-                            .get(&(*year, &id))
-                            .and_then(|days| Some(days[day_index]))
+                            .get(&(*year, id))
+                            .map(|days| days[day_index])
                             // if first star for new member, no previous result
                             .unwrap_or(0);
 
                     // compute delta if any
                     let (year, day) = (year, d);
-                    let hits = entries_of_interest.get(&(year, day, &id)).unwrap();
+                    let hits = entries_of_interest.get(&(year, day, id)).unwrap();
                     // compute delta
                     let durations = hits
                         .iter()

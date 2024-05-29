@@ -59,16 +59,15 @@ impl AoCSlackClient {
                 let response_text = event.to_string();
 
                 let response = match &event {
-                    Event::PrivateLeaderboardUpdated => {
-                        if let Some(channel_id) = &settings.slack_monitoring_channel {
-                            Some(SlackApiChatPostMessageRequest::new(
+                    Event::PrivateLeaderboardUpdated => settings
+                        .slack_monitoring_channel
+                        .as_ref()
+                        .map(|channel_id| {
+                            SlackApiChatPostMessageRequest::new(
                                 SlackChannelId(channel_id.to_string()),
                                 SlackMessageContent::new().with_text(response_text),
-                            ))
-                        } else {
-                            None
-                        }
-                    }
+                            )
+                        }),
                     Event::CommandReceived(channel_id, thread_ts, _cmd) => {
                         // let data = cache.data.lock().unwrap();
                         // // TODO: inject timestamp too
@@ -98,7 +97,7 @@ impl AoCSlackClient {
                             // If Solution thread initialization, post a first message in thread
                             if let Event::DailySolutionsThreadToInitialize(_day) = event {
                                 let thread_ts = res.ts;
-                                let message = format!(":warning: Last warning, spoiler ahead!");
+                                let message = ":warning: Last warning, spoiler ahead!".to_string();
                                 let first_thread_message = SlackApiChatPostMessageRequest::new(
                                     channel_id,
                                     SlackMessageContent::new().with_text(message),
@@ -160,22 +159,18 @@ async fn push_events_socket_mode_function(
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     if let SlackEventCallbackBody::Message(message) = event.event {
         // Only respond to messages from users (no bot_id) or allowed bots
-        if message
-            .sender
-            .bot_id
-            .and_then(|id| {
-                let settings = &config::SETTINGS;
-                match settings
-                    .slack_bots_authorized_ids
-                    .as_ref()
-                    .is_some_and(|whitelisted| whitelisted.contains(&id.to_string()))
-                {
-                    true => None,
-                    false => Some("Bot id not whitelisted"),
-                }
-            })
-            .is_none()
-        {
+        let is_not_whitelisted_bot = message.sender.bot_id.and_then(|id| {
+            let settings = &config::SETTINGS;
+            match settings
+                .slack_bots_authorized_ids
+                .as_ref()
+                .is_some_and(|whitelisted| whitelisted.contains(&id.to_string()))
+            {
+                true => None,
+                false => Some("Bot id not whitelisted"),
+            }
+        });
+        if is_not_whitelisted_bot.is_none() {
             // message from user, we will handle it if there is content and channel_id
             if let (Some(content), Some(channel_id)) = (message.content, message.origin.channel) {
                 if let Some(t) = content.text {

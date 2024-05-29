@@ -5,7 +5,7 @@ use crate::{
 use chrono::Duration;
 use itertools::Itertools;
 
-pub fn tdf_time_yearly(entries: &Vec<(&Identifier, i64, i64)>) -> String {
+pub fn tdf_time_yearly(entries: &[(&Identifier, i64, i64)]) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();
@@ -61,7 +61,7 @@ pub fn tdf_time_yearly(entries: &Vec<(&Identifier, i64, i64)>) -> String {
         .join("\n")
 }
 
-pub fn tdf_points_yearly(entries: &Vec<(&Identifier, i64, i64)>) -> String {
+pub fn tdf_points_yearly(entries: &[(&Identifier, i64, i64)]) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();
@@ -100,7 +100,7 @@ pub fn tdf_points_yearly(entries: &Vec<(&Identifier, i64, i64)>) -> String {
 }
 
 // Daily points
-pub fn tdf_points_daily(entries: &Vec<(&Identifier, usize)>) -> String {
+pub fn tdf_points_daily(entries: &[(&Identifier, usize)]) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();
@@ -128,7 +128,7 @@ pub fn tdf_points_daily(entries: &Vec<(&Identifier, usize)>) -> String {
 }
 
 // Daily times
-pub fn tdf_time_daily(entries: &Vec<(String, String)>) -> String {
+pub fn tdf_time_daily(entries: &[(String, String)]) -> String {
     // calculate width for positions
     // the width of the maximum position to be displayed, plus one for ')'
     let width_pos = entries.len().to_string().len();

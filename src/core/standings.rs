@@ -9,9 +9,9 @@ use std::{cmp::Reverse, collections::HashMap, fmt};
 
 // Time penalty added for TDF rankings if a day is not finished
 pub static PENALTY_UNFINISHED_DAY: Lazy<i64> = Lazy::new(|| Duration::days(7).num_seconds());
-const JERSEY_COLORS: [&'static str; 3] = ["yellow", "green", "combative"];
-const SCORING_METHODS: [&'static str; 2] = ["local", "stars"];
-const RANKING_METHODS: [&'static str; 4] = ["delta", "p1", "p2", "limit"];
+const JERSEY_COLORS: [&str; 3] = ["yellow", "green", "combative"];
+const SCORING_METHODS: [&str; 2] = ["local", "stars"];
+const RANKING_METHODS: [&str; 4] = ["delta", "p1", "p2", "limit"];
 
 // see https://en.wikipedia.org/wiki/Points_classification_in_the_Tour_de_France#Current
 const GREEN_JERSEY_POINTS: [u8; 15] = [50, 30, 20, 18, 16, 14, 12, 10, 8, 7, 6, 5, 4, 3, 2];
@@ -135,7 +135,7 @@ pub struct Standing<'a> {
 }
 
 impl Standing<'_> {
-    pub fn new<'a>(leaderboard: &'a Leaderboard) -> Standing<'a> {
+    pub fn new(leaderboard: &Leaderboard) -> Standing {
         Standing { leaderboard }
     }
 
@@ -164,12 +164,7 @@ impl Standing<'_> {
         }
     }
 
-    pub fn by_time<'a, 'b>(
-        &'a self,
-        ranking_type: &'b Ranking,
-        year: i32,
-        day: u8,
-    ) -> Vec<(String, String)> {
+    pub fn by_time(&self, ranking_type: &Ranking, year: i32, day: u8) -> Vec<(String, String)> {
         self.ranked_times_for_year_day(ranking_type, year, day)
             .map(|(id, duration)| (id.name.clone(), format_duration(duration)))
             .collect::<Vec<_>>()
@@ -212,7 +207,7 @@ impl Standing<'_> {
                     .into_iter()
                     .filter_map(|((_day, id), entries_for_day)| {
                         Standing::get_time_for_part(&entries_for_day, Ranking::PART2)
-                            .and_then(|duration| Some((id, duration)))
+                            .map(|duration| (id, duration))
                     })
                     .fold(HashMap::new(), |mut acc, (id, duration)| {
                         // (total duration, finished days, finished days below cutoff)
@@ -264,7 +259,7 @@ impl Standing<'_> {
                     .into_iter()
                     .filter_map(|((day, id), entries_for_day)| {
                         Standing::compute_delta(&entries_for_day)
-                            .and_then(|duration| Some((day, id, duration)))
+                            .map(|duration| (day, id, duration))
                     })
                     .into_group_map_by(|(day, _id, _duration)| *day);
 
@@ -274,7 +269,7 @@ impl Standing<'_> {
                         .map(|(_day, id, delta)| (id, delta))
                         // sort by delta time ascending
                         .sorted_unstable_by(|a, b| a.1.cmp(&b.1))
-                        .zip(GREEN_JERSEY_POINTS.into_iter())
+                        .zip(GREEN_JERSEY_POINTS)
                         .map(|((id, _delta), points)| (id, day, points))
                         .collect::<Vec<(&Identifier, u8, u8)>>()
                 });
@@ -304,7 +299,7 @@ impl Standing<'_> {
                     .into_iter()
                     .filter_map(|((_day, id), entries_for_day)| {
                         Standing::compute_time_before_next_release(&entries_for_day)
-                            .and_then(|duration| Some((id, duration)))
+                            .map(|duration| (id, duration))
                     })
                     .fold(HashMap::new(), |mut acc, (id, duration)| {
                         // (total points, scored days)
@@ -322,7 +317,7 @@ impl Standing<'_> {
                 let standings = duration_sum_per_member
                     .iter()
                     .map(|(id, (total_points, scored_days))| {
-                        (*id, *total_points as i64, *scored_days as i64)
+                        (*id, *total_points as i64, *scored_days)
                     })
                     // sort by total points descending, then by number of scored_days descendings
                     .sorted_unstable_by(|a, b| match a.1 == b.1 {
@@ -335,30 +330,30 @@ impl Standing<'_> {
         }
     }
 
-    fn ranked_times_for_year_day<'a, 'b>(
-        &'a self,
-        ranking_type: &'b Ranking,
+    fn ranked_times_for_year_day(
+        &self,
+        ranking_type: &Ranking,
         year: i32,
         day: u8,
-    ) -> impl Iterator<Item = (&'a Identifier, Duration)> + 'a {
+    ) -> impl Iterator<Item = (&Identifier, Duration)> {
         self.leaderboard
             .entries_per_member_for_year_day(year, day)
             .into_iter()
             .filter_map(|(id, entries_for_day)| match ranking_type {
                 Ranking::DELTA => {
-                    Self::compute_delta(&entries_for_day).and_then(|duration| Some((id, duration)))
+                    Self::compute_delta(&entries_for_day).map(|duration| (id, duration))
                 }
                 Ranking::PART1 => Self::get_time_for_part(&entries_for_day, Ranking::PART1)
-                    .and_then(|duration| Some((id, duration))),
+                    .map(|duration| (id, duration)),
                 Ranking::PART2 => Self::get_time_for_part(&entries_for_day, Ranking::PART2)
-                    .and_then(|duration| Some((id, duration))),
+                    .map(|duration| (id, duration)),
                 Ranking::LIMIT => Self::compute_time_before_next_release(&entries_for_day)
-                    .and_then(|duration| Some((id, duration))),
+                    .map(|duration| (id, duration)),
             })
             .sorted_unstable_by(|a, b| a.1.cmp(&b.1))
     }
 
-    fn compute_delta(daily_entries: &Vec<&Entry>) -> Option<Duration> {
+    fn compute_delta(daily_entries: &[&Entry]) -> Option<Duration> {
         match daily_entries.len() {
             2 => {
                 let mut ordered_parts =
@@ -373,7 +368,7 @@ impl Standing<'_> {
         }
     }
 
-    fn compute_time_before_next_release(daily_entries: &Vec<&Entry>) -> Option<Duration> {
+    fn compute_time_before_next_release(daily_entries: &[&Entry]) -> Option<Duration> {
         match daily_entries.len() {
             2 => {
                 let ordered_parts = daily_entries.iter().sorted_unstable_by_key(|s| s.timestamp);
@@ -394,7 +389,7 @@ impl Standing<'_> {
         }
     }
 
-    fn get_time_for_part(daily_entries: &Vec<&Entry>, part: Ranking) -> Option<Duration> {
+    fn get_time_for_part(daily_entries: &[&Entry], part: Ranking) -> Option<Duration> {
         match (daily_entries.len(), part) {
             (2, Ranking::PART1) => {
                 let ordered_parts = daily_entries.iter().sorted_unstable_by_key(|s| s.timestamp);
@@ -436,8 +431,8 @@ impl Standing<'_> {
 ////////////////////////////////////////////////
 
 /// ordered vec of (id, [(n_stars, daily score) for the 25 days], total_stars or total_score)
-pub fn standings_board<'a, 'b>(
-    score_type: &'b Scoring,
+pub fn standings_board<'a>(
+    score_type: &Scoring,
     leaderboard: &'a Leaderboard,
     year: i32,
 ) -> Vec<(&'a Identifier, [(u8, usize); 25], usize)> {

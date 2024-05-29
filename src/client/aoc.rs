@@ -37,6 +37,12 @@ pub struct AoC {
     private_leaderboard_id: u64,
 }
 
+impl Default for AoC {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AoC {
     pub fn new() -> Self {
         let settings = &config::SETTINGS;
@@ -118,7 +124,7 @@ impl AoC {
     }
 
     fn parse_daily_challenge_title(challenge: &str) -> BotResult<String> {
-        let document = Html::parse_document(&challenge);
+        let document = Html::parse_document(challenge);
         let selector_title = Selector::parse(r#"article.day-desc > h2"#).unwrap();
 
         let default = "N/A";
@@ -143,7 +149,7 @@ impl AoC {
         // entries associated with the first or second part, we will directly extract the part
         // information based on the siblings of the <p> elements.
 
-        let document = Html::parse_document(&leaderboard);
+        let document = Html::parse_document(leaderboard);
         let selector_first_part = Selector::parse(r#"span.leaderboard-daydesc-first"#).unwrap();
         let selector_second_part = Selector::parse(r#"span.leaderboard-daydesc-both"#).unwrap();
 
@@ -154,7 +160,7 @@ impl AoC {
             .map_or(vec![], |span| {
                 span.parent().map_or(vec![], |p| {
                     p.next_siblings()
-                        .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
+                        .filter_map(scraper::element_ref::ElementRef::wrap)
                         .filter_map(|entry| Entry::from_html(entry, year, day, ProblemPart::FIRST))
                         .collect::<Vec<Entry>>()
                 })
@@ -168,7 +174,7 @@ impl AoC {
             .map_or(vec![], |span| {
                 span.parent().map_or(vec![], |p| {
                     p.next_siblings()
-                        .filter_map(|entry| scraper::element_ref::ElementRef::wrap(entry))
+                        .filter_map(scraper::element_ref::ElementRef::wrap)
                         .filter_map(|entry| Entry::from_html(entry, year, day, ProblemPart::SECOND))
                         // Filter out entries of first part.
                         .filter(|e| {
@@ -223,7 +229,7 @@ impl AoC {
             get_star_ts: i64,
         }
 
-        let parsed = serde_json::from_str::<AOCPrivateLeaderboardResponse>(&leaderboard).unwrap();
+        let parsed = serde_json::from_str::<AOCPrivateLeaderboardResponse>(leaderboard).unwrap();
         let mut earned_stars = Leaderboard::new();
 
         for (_, member) in parsed.members.iter() {

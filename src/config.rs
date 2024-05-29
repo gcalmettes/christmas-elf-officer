@@ -9,9 +9,9 @@ use serde::Deserialize;
 use std::path::Path;
 use tracing::Level;
 
-const TRACE_LEVELS: [&'static str; 5] = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"];
+const TRACE_LEVELS: [&str; 5] = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"];
 
-pub static SETTINGS: Lazy<Settings> = Lazy::new(|| Settings::new());
+pub static SETTINGS: Lazy<Settings> = Lazy::new(Settings::new);
 
 // Settings are a singleton generated at runtime. All settings may be
 // configured via environment variables. Example:
@@ -40,6 +40,12 @@ pub struct Settings {
     // Whether to load the private leaderboard for all the previous AOC events
     #[serde(default = "default_all_years")]
     pub all_years: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Settings {
