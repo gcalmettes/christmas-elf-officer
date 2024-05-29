@@ -62,8 +62,7 @@ impl Command {
             Some(cmd) if cmd == &COMMANDS[1] => {
                 let ranking_str = parsed
                     .get("option")
-                    .and_then(|o| Some(*o))
-                    .unwrap_or_else(|| Ranking::get_default_str());
+                    .map_or(Ranking::get_default_str(), |o| *o);
                 let ranking = Ranking::from_string(ranking_str).unwrap_or(Ranking::DELTA);
                 let year = parsed
                     .get("year")
@@ -91,8 +90,7 @@ impl Command {
             Some(cmd) if cmd == &COMMANDS[2] => {
                 let scoring_str = parsed
                     .get("option")
-                    .and_then(|o| Some(*o))
-                    .unwrap_or_else(|| &Scoring::get_default_str());
+                    .map_or(Scoring::get_default_str(), |o| *o);
                 let scoring = Scoring::from_string(scoring_str).unwrap_or(Scoring::LOCAL);
                 let year = parsed
                     .get("year")
@@ -115,8 +113,7 @@ impl Command {
             Some(cmd) if cmd == &COMMANDS[3] => {
                 let jersey_str = parsed
                     .get("option")
-                    .and_then(|o| Some(*o))
-                    .unwrap_or_else(|| &Jersey::get_default_str());
+                    .map_or(Jersey::get_default_str(), |o| *o);
                 let jersey = Jersey::from_string(jersey_str).unwrap_or(Jersey::YELLOW);
                 let year = parsed
                     .get("year")

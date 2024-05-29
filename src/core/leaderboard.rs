@@ -409,10 +409,10 @@ impl Leaderboard {
             p2_slow: Some(*p2_slow - challenge_start_time),
             delta_fast: sorted_deltas_iter
                 .next()
-                .and_then(|(_name, duration, rank)| Some((*duration, *rank))),
+                .map(|(_name, duration, rank)| (*duration, *rank)),
             delta_slow: sorted_deltas_iter
                 .last()
-                .and_then(|(_name, duration, rank)| Some((*duration, *rank))),
+                .map(|(_name, duration, rank)| (*duration, *rank)),
         };
         Ok(stats)
     }
@@ -521,7 +521,7 @@ impl Leaderboard {
         let max_time_first_part = self
             .min_max_times_for_year_day(year, day)
             .get(&ProblemPart::FIRST)
-            .and_then(|(_p1_fast, p1_slow)| Some(*p1_slow))
+            .map(|(_p1_fast, p1_slow)| *p1_slow)
             .ok_or(BotError::Compute(
                 "MinMax times could not be computed".to_string(),
             ))?;
@@ -575,6 +575,12 @@ impl DerefMut for Leaderboard {
     }
 }
 
+impl Default for ScrapedLeaderboard {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScrapedLeaderboard {
     pub fn new() -> ScrapedLeaderboard {
         ScrapedLeaderboard {
@@ -590,7 +596,6 @@ impl ScrapedLeaderboard {
         // leaderboard if we find duplicates for same id ?
 
         // Cloning the leaderboard is expensive, but this operation is only done every 15min
-        self.leaderboard
-            .extend(other.leaderboard.clone().into_iter());
+        self.leaderboard.extend(other.leaderboard.clone());
     }
 }
