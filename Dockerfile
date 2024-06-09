@@ -1,7 +1,7 @@
 #####################################################################################################
 ### Builder
 #####################################################################################################
-FROM rust:1.73-alpine as builder
+FROM rust:1.78-alpine as builder
 RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconf git libpq-dev
 
 # Set `SYSROOT` to a dummy path (default is /usr) because pkg-config-rs *always*
