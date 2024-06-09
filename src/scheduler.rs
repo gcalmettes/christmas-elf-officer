@@ -7,7 +7,7 @@ use crate::{
     },
     error::{BotError, BotResult},
     storage::MemoryCache,
-    utils::{compute_highlights, current_year_day, get_new_members},
+    utils::{compute_highlights, current_aoc_year_day, get_new_members},
 };
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Sender, time};
@@ -90,7 +90,7 @@ async fn initialize_private_leaderboard_job(cache: MemoryCache) -> BotResult<Job
             let aoc_client = AoC::new();
             let settings = &config::SETTINGS;
 
-            let (current_year, _day) = current_year_day();
+            let (current_year, _day) = current_aoc_year_day();
             let mut live_years = vec![current_year];
             if settings.all_years {
                 live_years.extend(2015..current_year)
@@ -120,7 +120,7 @@ async fn initialize_daily_solutions_thread_job(
     let job = Job::new_async(schedule, move |_uuid, _l| {
         let sender = sender.clone();
         Box::pin(async move {
-            let (_year, day) = current_year_day();
+            let (_year, day) = current_aoc_year_day();
             if let Err(e) = sender
                 .send(Event::DailySolutionsThreadToInitialize(day))
                 .await
@@ -145,7 +145,7 @@ async fn update_private_leaderboard_job(
         Box::pin(async move {
             let aoc_client = AoC::new();
 
-            let (year, _day) = current_year_day();
+            let (year, _day) = current_aoc_year_day();
             match aoc_client.private_leaderboard(year).await {
                 Ok(scraped_leaderboard) => {
                     // Scoped to force 'current_leaderboard' to drop before 'await' so future can be Send.
@@ -238,7 +238,7 @@ async fn watch_global_leaderboard_job(
             // to ensure the counter reflects interval time multiples.
             interval.tick().await;
 
-            let (year, day) = current_year_day();
+            let (year, day) = current_aoc_year_day();
 
             let mut known_hero_hashes: Vec<String> = vec![];
 
@@ -347,7 +347,7 @@ async fn parse_daily_challenge_job(schedule: &str, sender: Arc<Sender<Event>>) -
         Box::pin(async move {
             let aoc_client = AoC::new();
 
-            let (year, day) = current_year_day();
+            let (year, day) = current_aoc_year_day();
 
             info!("Retrieving challenge title for day {day}.");
 
@@ -382,7 +382,7 @@ async fn send_daily_summary_job(
         let cache = cache.clone();
         let sender = sender.clone();
         Box::pin(async move {
-            let (year, day) = current_year_day();
+            let (year, day) = current_aoc_year_day();
             let (p1, p2, delta) = {
                 let leaderboard = cache.data.lock().unwrap();
                 let standings = Standing::new(&leaderboard.leaderboard);

@@ -28,7 +28,10 @@ pub fn format_rank(rank: u8) -> String {
     format!("{}{}", rank, ordinal_number_suffix(rank))
 }
 
-pub fn current_year_day() -> (i32, u8) {
+/// Get the last valid AOC (year, day) combo.
+/// If AOC is ongoing, returns the current year and current day.
+/// If AOC is over, returns the previous year, last day (25).
+pub fn current_aoc_year_day() -> (i32, u8) {
     let now = Utc::now();
     let year = now.year();
 
@@ -42,28 +45,12 @@ pub fn current_year_day() -> (i32, u8) {
         true => year,
         false => year - 1,
     };
-    let day = now.day() as u8;
+    let day = match (start_aoc_period <= now, now.day() <= 25) {
+        (true, true) => now.day() as u8,
+        _ => 25,
+    };
     (year, day)
 }
-
-// /// Get the last valid AOC (year, day) combo.
-// /// If AOC is ongoing, returns the current year and current day.
-// /// If AOC is over, returns the previous year (no specific day).
-// pub fn current_aoc_year_day() -> (i32, Option<u8>) {
-//     let now = Utc::now();
-//     let year = now.year();
-
-//     // We start taking the current year into account 10 days before the first puzzle unlocks.
-//     let start_aoc_period = Entry::puzzle_unlock(year, 1)
-//         .ok()
-//         // if something wrong happen in the parsing, we won't take the current year into account
-//         .map_or_else(|| now + Duration::minutes(10), |t| t - Duration::days(10));
-
-//     match start_aoc_period <= now {
-//         true => (year, Some(now.day() as u8)),
-//         false => (year - 1, None),
-//     }
-// }
 
 pub fn format_duration(duration: Duration) -> String {
     let seconds = duration.num_seconds() % 60;

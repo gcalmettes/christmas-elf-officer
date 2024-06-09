@@ -5,7 +5,9 @@ use crate::{
         standings::Ranking,
         templates::MessageTemplate,
     },
-    utils::{current_year_day, format_duration, format_rank, ordinal_number_suffix, DayHighlight},
+    utils::{
+        current_aoc_year_day, format_duration, format_rank, ordinal_number_suffix, DayHighlight,
+    },
 };
 use chrono::{Datelike, Local};
 use itertools::Itertools;
@@ -179,7 +181,7 @@ impl fmt::Display for Event {
                 )
             }
             Event::PrivateLeaderboardNewEntries(entries) => {
-                let (year, today) = current_year_day();
+                let (year, today) = current_aoc_year_day();
 
                 let is_today_entries = entries
                     .iter()

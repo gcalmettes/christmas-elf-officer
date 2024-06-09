@@ -5,7 +5,7 @@ use crate::{
         standings::{standings_board, Jersey, Ranking, Scoring, Standing},
         templates::invalid_year_day_message,
     },
-    utils::current_year_day,
+    utils::current_aoc_year_day,
 };
 use chrono::{DateTime, Utc};
 use once_cell::sync::Lazy;
@@ -67,11 +67,11 @@ impl Command {
                 let year = parsed
                     .get("year")
                     .and_then(|d| d.parse::<i32>().ok())
-                    .unwrap_or_else(|| current_year_day().0);
+                    .unwrap_or_else(|| current_aoc_year_day().0);
                 let day = parsed
                     .get("day")
                     .and_then(|d| d.parse::<u8>().ok())
-                    .unwrap_or_else(|| current_year_day().1);
+                    .unwrap_or_else(|| current_aoc_year_day().1);
 
                 if let Some(msg) = invalid_year_day_message(year, Some(day)) {
                     Some(Command::NotValid(msg))
@@ -95,7 +95,7 @@ impl Command {
                 let year = parsed
                     .get("year")
                     .and_then(|d| d.parse::<i32>().ok())
-                    .unwrap_or_else(|| current_year_day().0);
+                    .unwrap_or_else(|| current_aoc_year_day().0);
 
                 if let Some(msg) = invalid_year_day_message(year, None) {
                     Some(Command::NotValid(msg))
@@ -118,7 +118,7 @@ impl Command {
                 let year = parsed
                     .get("year")
                     .and_then(|d| d.parse::<i32>().ok())
-                    .unwrap_or_else(|| current_year_day().0);
+                    .unwrap_or_else(|| current_aoc_year_day().0);
                 let day = parsed.get("day").and_then(|d| d.parse::<u8>().ok());
 
                 if let Some(msg) = invalid_year_day_message(year, day) {

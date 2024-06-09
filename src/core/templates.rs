@@ -1,6 +1,6 @@
 use crate::{
     core::leaderboard::Entry,
-    utils::{current_year_day, format_rank},
+    utils::{current_aoc_year_day, format_rank},
 };
 use chrono::{Duration, Utc};
 use minijinja::{Environment, Template};
@@ -221,7 +221,7 @@ pub fn invalid_year_day_message(year: i32, day: Option<u8>) -> Option<String> {
         ));
     };
 
-    let (current_year, current_day) = current_year_day();
+    let (current_year, current_day) = current_aoc_year_day();
 
     // in the future
     if year > current_year {
