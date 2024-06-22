@@ -15,7 +15,7 @@ Configuration of the bot can be achieve via (from lower to higher precedence):
 * or command line flags (limited to some settings only).
 
 
-| Setting                                   | Mandatory | Description                                                                                                            | default (if any)          |
+| Setting                                   | Mandatory | <div style="width:290px">Description</div>                                                                                                            | default (if any)          |
 |-------------------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------|---------------------------|
 | `trace_level`                             |           | trace level for bot logs (on server)                                                                                   |`INFO`                     |
 | `slack_token`                             | ✅        | [Bot token](https://api.slack.com/authentication/token-types#bot) associated with your slack app. Starts with `xoxb-`  |                           |
