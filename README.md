@@ -1,6 +1,9 @@
 # christmas-elf-officer
 An Advent of Code cheerful friend
 
+<img style="display: block; margin-left: auto; margin-right: auto; width: 45%;" src="https://raw.githubusercontent.com/gcalmettes/christmas-elf-officer/main/img/daily-problem.png"></img>
+<img style="display: block; margin-left: auto; margin-right: auto; width: 45%;" src="https://raw.githubusercontent.com/gcalmettes/christmas-elf-officer/main/img/daily-summary.png"></img>
+
 # Architecture
 
 <img style="display: block; margin-left: auto; margin-right: auto; width: 95%;" src="https://raw.githubusercontent.com/gcalmettes/christmas-elf-officer/main/img/hld-ceo.png"></img>
