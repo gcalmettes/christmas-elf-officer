@@ -14,7 +14,7 @@ use itertools::Itertools;
 use minijinja::context;
 use slack_morphism::{SlackChannelId, SlackTs};
 use std::fmt;
-use text_to_ascii_art::convert;
+use text_to_ascii_art::to_art;
 
 const MEDALS: [&str; 3] = ["🥇", "🥈", "🥉"];
 const TROPHIES: [&str; 5] = ["🏆", "🥈", "🥉", "🍫", "🍬"];
@@ -37,7 +37,7 @@ pub enum Event {
     GlobalLeaderboardComplete((u8, LeaderboardStatistics)),
     GlobalLeaderboardHeroFound((String, ProblemPart, u8)),
     GlobalLeaderboardUpdateMessage(u64, u64),
-    DailyChallengeIsUp(u8, String),
+    DailyChallengeIsUp(u8, String, String),
     DailySummary(
         i32,
         u8,
@@ -68,9 +68,9 @@ impl fmt::Display for Event {
                         .unwrap()
                 )
             }
-            Event::DailyChallengeIsUp(day, title) => {
+            Event::DailyChallengeIsUp(day, title, challenge_url) => {
                 let day = format!("Day {day}");
-                let header = match convert(day) {
+                let header = match to_art(day.to_string(), "small", 0, 0, 0) {
                     Ok(string) => string,
                     Err(_) => "".to_string(),
                 };
@@ -79,7 +79,7 @@ impl fmt::Display for Event {
                     "{}",
                     MessageTemplate::DailyChallenge
                         .get()
-                        .render(context! { header => header, title => title })
+                        .render(context! { header => header, title => title, url => challenge_url })
                         .unwrap()
                 )
             }

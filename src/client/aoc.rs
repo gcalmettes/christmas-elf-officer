@@ -82,6 +82,12 @@ impl AoC {
         Ok(title)
     }
 
+    pub fn daily_challenge_url(&self, year: i32, day: u8) -> String {
+        let endpoint = Endpoint::DailyChallenge(year, day);
+        let url = format!("{}{}", self.base_url, endpoint);
+        url
+    }
+
     async fn get(&self, endpoint: &Endpoint, session_cookie: Option<String>) -> BotResult<String> {
         let url = format!("{}{}", self.base_url, endpoint);
 

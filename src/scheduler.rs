@@ -348,13 +348,13 @@ async fn parse_daily_challenge_job(schedule: &str, sender: Arc<Sender<Event>>) -
             let aoc_client = AoC::new();
 
             let (year, day) = current_aoc_year_day();
+            let challenge_url = aoc_client.daily_challenge_url(year, day);
 
             info!("Retrieving challenge title for day {day}.");
-
             match aoc_client.daily_challenge(year, day).await {
                 Ok(title) => {
                     if let Err(e) = sender
-                        .send(Event::DailyChallengeIsUp(day, title.clone()))
+                        .send(Event::DailyChallengeIsUp(day, title.clone(), challenge_url))
                         .await
                     {
                         let error = BotError::ChannelSend(format!(
