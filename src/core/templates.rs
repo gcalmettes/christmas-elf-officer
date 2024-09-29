@@ -119,7 +119,7 @@ impl MessageTemplate {
             },
             MessageTemplate::DailyChallenge => {
                 "```{{header}}```\n\
-                🎉 Today's challenge is up!\n\
+                🎉 Today's challenge is up! (<{{url}}|link>)\n\
                     \x20 *{{title}}*\n\
                 🔫 Go after it and get some fun, ⏱️ time is ticking !"
             },

@@ -20,6 +20,8 @@ pub mod utils;
 #[tokio::main]
 // async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
     let settings = &config::SETTINGS;
 
     let subscriber = tracing_subscriber::FmtSubscriber::builder()
