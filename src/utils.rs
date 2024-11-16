@@ -35,11 +35,11 @@ pub fn current_aoc_year_day() -> (i32, u8) {
     let now = Utc::now();
     let year = now.year();
 
-    // We start taking the current year into account 10 days before the first puzzle unlocks.
+    // We start taking the current year into account 15 days before the first puzzle unlocks.
     let start_aoc_period = Entry::puzzle_unlock(year, 1)
         .ok()
         // if something wrong happen in the parsing, we won't take the current year into account
-        .map_or_else(|| now + Duration::minutes(10), |t| t - Duration::days(10));
+        .map_or_else(|| now + Duration::minutes(10), |t| t - Duration::days(15));
 
     let year = match start_aoc_period <= now {
         true => year,
