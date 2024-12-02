@@ -7,7 +7,7 @@ use crate::{
     },
     error::{BotError, BotResult},
     storage::MemoryCache,
-    utils::{self, compute_highlights, current_aoc_year_day, get_new_members},
+    utils::{compute_highlights, current_aoc_year_day, get_new_members},
 };
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Sender, time};

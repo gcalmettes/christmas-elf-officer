@@ -52,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let jobs = vec![
         JobProcess::InitializePrivateLeaderboard, // only ran once, at startup.
         JobProcess::UpdatePrivateLeaderboard(&private_leaderboard_schedule),
-        JobProcess::InitializeDailySolutionsThread("0 30 8 1-25 12 *"),
+        JobProcess::InitializeDailySolutionsThread("0 30 7 1-25 12 *"),
         JobProcess::WatchGlobalLeaderboard("0 0 5 1-25 12 *"),
         JobProcess::ParseDailyChallenge("1 0 5 1-25 12 *"),
         JobProcess::SendDailySummary("0 30 16 1-25 12 *"),
