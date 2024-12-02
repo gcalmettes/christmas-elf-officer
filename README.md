@@ -18,7 +18,7 @@ Configuration of the bot can be achieve via (from lower to higher precedence):
 * or command line flags (limited to some settings only).
 
 
-| Setting                                   | Mandatory | <div style="width:290px">Description</div>                                                                                                            | default (if any)          |
+| Setting                                   | Mandatory | <div style="width:290px">Description</div>                                                                             | default (if any)          |
 |-------------------------------------------|-----------|------------------------------------------------------------------------------------------------------------------------|---------------------------|
 | `trace_level`                             |           | trace level for bot logs (on server)                                                                                   |`INFO`                     |
 | `slack_token`                             | ✅        | [Bot token](https://api.slack.com/authentication/token-types#bot) associated with your slack app. Starts with `xoxb-`  |                           |
@@ -32,6 +32,7 @@ Configuration of the bot can be achieve via (from lower to higher precedence):
 | `aoc_private_leaderboard_id`              | ✅        | private leaderboard ID from which the bot will compute its metrics and updates                                         |                           |
 | `aoc_session_cookie`                      | ✅        | AOC session cookie so the bot can access the private leaderboard specified                                             |                           |
 | `all_years`                               |           | whether to load all the previous AOC years or not in the bot internal database                                         |`false`                    |
+| `summary_events_only`                     |           | whether to only send the daily summary events instead of all stars completions                                         |`false`                    |
 
 ### Local `yaml` configuration file
 
@@ -48,6 +49,7 @@ slack_bots_authorized_ids:
 aoc_private_leaderboard_id: 000000
 aoc_session_cookie: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 all_years: true
+summary_events_only: false
 ```
 
 ### Environment variables
@@ -138,4 +140,5 @@ AOC_BASE_URL=https://adventofcode.com
 AOC_PRIVATE_LEADERBOARD_ID=00000000
 AOC_SESSION_COOKIE=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ALL_YEARS=true
+SUMMARY_EVENTS_ONLY=false
 ```

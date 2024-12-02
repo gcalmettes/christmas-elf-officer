@@ -7,7 +7,7 @@ use crate::{
     },
     error::{BotError, BotResult},
     storage::MemoryCache,
-    utils::{compute_highlights, current_aoc_year_day, get_new_members},
+    utils::{self, compute_highlights, current_aoc_year_day, get_new_members},
 };
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc::Sender, time};
@@ -144,6 +144,7 @@ async fn update_private_leaderboard_job(
         let sender = sender.clone();
         Box::pin(async move {
             let aoc_client = AoC::new();
+            let settings = &config::SETTINGS;
 
             let (year, _day) = current_aoc_year_day();
             match aoc_client.private_leaderboard(year).await {
@@ -171,7 +172,7 @@ async fn update_private_leaderboard_job(
                     };
 
                     // Conditionnally trigger internal events, base on leaderboard processing.
-                    if !new_members.is_empty() {
+                    if !settings.summary_events_only && !new_members.is_empty() {
                         if let Err(e) = sender
                             .send(Event::PrivateLeaderboardNewMembers(new_members))
                             .await
@@ -182,7 +183,7 @@ async fn update_private_leaderboard_job(
                             error!("{error}");
                         };
                     }
-                    if !highlights.is_empty() {
+                    if !settings.summary_events_only && !highlights.is_empty() {
                         if let Err(e) = sender
                             .send(Event::PrivateLeaderboardNewEntries(highlights))
                             .await

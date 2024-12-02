@@ -40,6 +40,11 @@ pub struct Settings {
     // Whether to load the private leaderboard for all the previous AOC events
     #[serde(default = "default_all_years")]
     pub all_years: bool,
+    // Whether to send only summary events.
+    // By default every users stars collection is sent as an update. This can be
+    // very verbose for very large leaderboards where lots of activity happens.
+    #[serde(default = "default_summary_events_only")]
+    pub summary_events_only: bool,
 }
 
 impl Default for Settings {
@@ -107,5 +112,9 @@ fn default_aoc_base_url() -> String {
 }
 
 fn default_all_years() -> bool {
+    false
+}
+
+fn default_summary_events_only() -> bool {
     false
 }
